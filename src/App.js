@@ -134,41 +134,32 @@ class App extends React.Component {
         cube.userData.color = randomColors[count];
         cube.userData.intersects = [];
         cube.userData.position = cube.position.clone();
+
         cube.userData.update = ($this) => {
           let cube_limit = {};
 
           if($this.userData.intersects.length > 0){
-
             const hasCollitionLeft = $this.userData.intersects.includes("L");
             const hasCollitionBottom = $this.userData.intersects.includes("B");
+            const hasCollitionRight = $this.userData.intersects.includes("R");
+            const hasCollitionTop = $this.userData.intersects.includes("T");
+            console.log("hasCollitionBottom => ", hasCollitionBottom);
 
             const xMin = hasCollitionLeft ? $this.userData.position.x : -1 * cub2
+            // console.log('$this.userData.position.y ==> ', $this.userData.position.y)
             const yMin = hasCollitionBottom ? $this.userData.position.y : -1 * cub2
+            const xMax = hasCollitionRight ? $this.userData.position.x :  cub2
+            const yMax = hasCollitionTop ? $this.userData.position.y :  cub2
+
+            cube_limit.max = new THREE.Vector3(xMax, yMax, 0);
             cube_limit.min = new THREE.Vector3(xMin, yMin, 0);
           } else {
             cube_limit.min = new THREE.Vector3(-1 * cub2, -1 * cub2, 0);
+            cube_limit.max = new THREE.Vector3(cub2, cub2, 0);
           }
 
-          if($this.userData.intersects.length > 0){
-
-            const hasCollitionRight = $this.userData.intersects.includes("R");
-            const hasCollitionTop = $this.userData.intersects.includes("T");
-            
-            const xMax = hasCollitionRight ? $this.userData.position.x :  cub2
-            const yMax = hasCollitionTop ? $this.userData.position.y :  cub2
-            cube_limit.max = new THREE.Vector3(xMax, yMax, 0);
-          } else {
-            cube_limit.max = new THREE.Vector3(cub2, cub2, 0)
-          }
-          // if intersected on top 
-          // cube_limit.max = new THREE.Vector3(cub2, $this.position.y, 0)
-
-          // else if intersected on bottom 
-          // cube_limit.min = new THREE.Vector3(-1 * cub2, $this.position.y, 0)
-
-
-          // console.log('cube_limit.min => ', cube_limit.min);
-
+          console.log("cube_limit.min", cube_limit.min)
+          console.log("cube_limit.max", cube_limit.max)
           cube.position.clamp(cube_limit.min, cube_limit.max);
         }
         
@@ -236,13 +227,22 @@ class App extends React.Component {
         intersectsResults.push('L')
       }
       if(instersectsTop.length > 0){
-        intersectsResults.push('T')
+        console.log(instersectsTop);
+        const closeIntersections = instersectsTop.filter( intersect => intersect.distance <= .5);
+        if(closeIntersections.length > 0) {
+          console.log('Top Colllision Close!')
+          intersectsResults.push('T')
+        }
       }
       if(instersectsRight.length > 0){
         intersectsResults.push('R')
       }
       if(instersectsBottom.length > 0){
-        intersectsResults.push('B')
+        const closeIntersections = instersectsBottom.filter( intersect => intersect.distance <= .5);
+        if(closeIntersections.length > 0) {
+          console.log('Bottom Colllision Close!')
+          intersectsResults.push('B');
+        }
       }
 
       cube.userData.intersects = intersectsResults;
@@ -273,7 +273,67 @@ class App extends React.Component {
      });
      
      dragControls.addEventListener ( 'drag', function( event ){
-      // console.log('drag');
+      // console.log('dragging');
+      let cube = event.object;
+      
+      var originPoint = cube.position.clone();
+      const rayOrigin = new THREE.Vector3(originPoint.x, originPoint.y, 0);
+
+      const raycasterLeft = new THREE.Raycaster();
+      const rayDirectionLeft = new THREE.Vector3(-2 , 0, 0).normalize();
+
+      const raycasterTop = new THREE.Raycaster();
+      const rayDirectionTop = new THREE.Vector3(0, 2, 0).normalize();
+
+      const raycasterRight = new THREE.Raycaster();
+      const rayDirectionRight = new THREE.Vector3(2, 0, 0).normalize();
+
+      const raycasterBottom = new THREE.Raycaster();
+      const rayDirectionBottom = new THREE.Vector3(0, -2, 0).normalize();
+      
+      raycasterLeft.set(rayOrigin, rayDirectionLeft);
+      raycasterTop.set(rayOrigin, rayDirectionTop);
+      raycasterRight.set(rayOrigin, rayDirectionRight);
+      raycasterBottom.set(rayOrigin, rayDirectionBottom);
+
+      const instersectsLeft = raycasterLeft.intersectObjects(cubes);
+      const instersectsTop = raycasterTop.intersectObjects(cubes);
+      const instersectsRight = raycasterRight.intersectObjects(cubes);
+      const instersectsBottom = raycasterBottom.intersectObjects(cubes);
+      
+      // scene.add(new THREE.ArrowHelper(raycasterLeft.ray.direction, raycasterLeft.ray.origin, 500, 0xff0000) );
+      // scene.add(new THREE.ArrowHelper(raycasterTop.ray.direction, raycasterTop.ray.origin, 500, 0xff0000) );
+      // scene.add(new THREE.ArrowHelper(raycasterRight.ray.direction, raycasterRight.ray.origin, 500, 0xff0000) );
+      // scene.add(new THREE.ArrowHelper(raycasterBottom.ray.direction, raycasterBottom.ray.origin, 500, 0xff0000) );
+
+      const intersectsResults = [];
+      
+      // if(instersectsLeft.length > 0){
+      //   intersectsResults.push('L')
+      // }
+      // if(instersectsTop.length > 0){
+      //   console.log(instersectsTop);
+      //   const closeIntersections = instersectsTop.filter( intersect => intersect.distance <= .5);
+      //   if(closeIntersections.length > 0) {
+      //     console.log('Top Colllision Close!')
+      //     intersectsResults.push('T')
+      //   }
+      // }
+      // if(instersectsRight.length > 0){
+      //   intersectsResults.push('R')
+      // }
+      // console.log("instersectsBottom = ", instersectsBottom)
+      if(instersectsBottom.length > 0){
+        const closeIntersections = instersectsBottom.filter( intersect => intersect.distance <= .5);
+
+        if(closeIntersections.length > 0) {
+          intersectsResults.push('B');
+        }
+      }
+
+      cube.userData.intersects = intersectsResults;
+      cube.userData.update(cube);
+
       event.object.position.z = 0; // This will prevent moving z axis, but will be on 0 line. change this to your object position of z axis.
      })
 
@@ -283,6 +343,8 @@ class App extends React.Component {
       controls.enabled = true;
       // console.log('event.object.userData.color', event.object.userData);
       // event.object.userData.setColor(rubik_colors[event.object.userData.color]);
+      const cube = event.object;
+      cube.userData.position = cube.position.clone();
       renderer.render( scene, camera );
      });
 
