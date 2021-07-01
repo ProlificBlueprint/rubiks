@@ -8,7 +8,7 @@ import { DragControls } from 'three/examples/jsm/controls/DragControls';
 import * as dat from 'dat.gui';
 
 let camera, cubes, dragControls, scene, renderer, appEl;
-let geometry, material, raycaster, controls, gridGroup;
+let geometry, material, raycaster, controls, gameBoard;
 let gridGap = .01;
 let cubeSize = 1;
 
@@ -96,36 +96,18 @@ class App extends React.Component {
   }
 
   generateCubes = () => {
-    gridGroup = new THREE.Group();
+    gameBoard = new THREE.Group();
     cubes = [];
     
-    
-    // const rayDirection2 = new THREE.Vector3(-1 * cub2, -1 * cub2, 0);
-    // const rayDirection3 = new THREE.Vector3(-1 * cub2, -1 * cub2, 0);
-    // const rayDirection4 = new THREE.Vector3(-1 * cub2, -1 * cub2, 0);
-
     const cub2 = cubeSize * 2;
 
-    const sq_x = -1 * cub2;
-    const sq_y = -1 * cub2;
-    const sq_z = 0;
     
-    const cube_limit = {
-      min: new THREE.Vector3(sq_x, sq_y, 0),
-      max: new THREE.Vector3(cub2, cub2, 0)
-    };
 
     let count = 0;
     let i, j;
+
     // grid
     const gridWidth = cubeSize * 5 ;
-
-    const dimensions = {
-      top: (gridWidth/2),
-      right: (gridWidth/2),
-      bottom: (gridWidth/2)*-1,
-      left: (gridWidth/2)*-1,
-    }
 
 
     const color_array = [
@@ -137,25 +119,56 @@ class App extends React.Component {
      'red', 'red', 'red', 'red'];
 
     const randomColors = this.shuffle(color_array);
-    // console.log(randomColors);
 
     for(i = 0; i < 5 ; i++ ){
       for(j = 0; j< 5; j++){
 
-        let geometry1 = new THREE.BoxGeometry(cubeSize -.01, cubeSize -.01, .1);
-        // let geometry1 = new THREE.CubeGeometry(50,50,50,1,1,1)
-        // material = new THREE.MeshNormalMaterial();
-        let material1 = new THREE.MeshBasicMaterial({
+        let geometry = new THREE.BoxGeometry(cubeSize -.01, cubeSize -.01, .1);
+        let material = new THREE.MeshBasicMaterial({
           color: rubik_colors[randomColors[count]]
         });
-        const cube = new THREE.Mesh(geometry1, material1);
-
+        const cube = new THREE.Mesh(geometry, material);
         cube.position.x = -1 * i + cubeSize * 2;
         cube.position.y = -1 * j + cubeSize * 2;
         cube.userData.id = `${i}${j}`;
         cube.userData.color = randomColors[count];
+        cube.userData.intersects = [];
+        cube.userData.position = cube.position.clone();
+        cube.userData.update = ($this) => {
+          let cube_limit = {};
 
-        cube.userData.update = function(){
+          if($this.userData.intersects.length > 0){
+
+            const hasCollitionLeft = $this.userData.intersects.includes("L");
+            const hasCollitionBottom = $this.userData.intersects.includes("B");
+
+            const xMin = hasCollitionLeft ? $this.userData.position.x : -1 * cub2
+            const yMin = hasCollitionBottom ? $this.userData.position.y : -1 * cub2
+            cube_limit.min = new THREE.Vector3(xMin, yMin, 0);
+          } else {
+            cube_limit.min = new THREE.Vector3(-1 * cub2, -1 * cub2, 0);
+          }
+
+          if($this.userData.intersects.length > 0){
+
+            const hasCollitionRight = $this.userData.intersects.includes("R");
+            const hasCollitionTop = $this.userData.intersects.includes("T");
+            
+            const xMax = hasCollitionRight ? $this.userData.position.x :  cub2
+            const yMax = hasCollitionTop ? $this.userData.position.y :  cub2
+            cube_limit.max = new THREE.Vector3(xMax, yMax, 0);
+          } else {
+            cube_limit.max = new THREE.Vector3(cub2, cub2, 0)
+          }
+          // if intersected on top 
+          // cube_limit.max = new THREE.Vector3(cub2, $this.position.y, 0)
+
+          // else if intersected on bottom 
+          // cube_limit.min = new THREE.Vector3(-1 * cub2, $this.position.y, 0)
+
+
+          // console.log('cube_limit.min => ', cube_limit.min);
+
           cube.position.clamp(cube_limit.min, cube_limit.max);
         }
         
@@ -166,138 +179,138 @@ class App extends React.Component {
         cube.userData.setMetalness = function(){
           // cube.material.metal
         }
+
+        // cube.userData.update.bind(cube);
     
-
-        // const rayOrigin = new THREE.Vector3(-3, 0 ,0);
-        // const rayDirection = new THREE.Vector3(10,0,0);
-        // rayDirection.normalize();
-
-        // raycaster.set(rayOrigin, rayDirection);
-
-
-        // const intersects = raycaster.intersectObjects(cubes);
-        // console.log(intersects);
-
         cubes.push(cube);
         if(i !== 4 || j !== 4) {
-          gridGroup.add(cube);
+          gameBoard.add(cube);
         }
         count++;
       }
     }
 
-    gridGroup.rotation.x = -1.58;
-    
-
-    gui.add(gridGroup.rotation, 'x', -1).step(0.01).min(-3).max(3).name('grid rotate');
-    gui.add(gridGroup.position, 'x', 1).name('grid x');
-    gui.add(gridGroup.position, 'y', 1).name('grid y');
+    gui.add(gameBoard.position, 'x', 0).name('grid x');
+    gui.add(gameBoard.position, 'y', 0).name('grid y');
 
     dragControls = new DragControls(cubes, camera, renderer.domElement);
     
     dragControls.addEventListener( 'dragstart', function ( event ) {
-      // console.log('drag start', event);
-      // console.log(event.object);
-      event.object.userData.setColor('0xff0000');
-
-      
-
-      const cx = event.object.position.x + cubeSize/2;
-      const cy = event.object.position.y - cubeSize/2;
+      // affect obj
+      // event.object.userData.setColor('0xff0000');
 
       let cube = event.object;
-      raycaster = new THREE.Raycaster();
       var originPoint = cube.position.clone();
-      const rayOrigin = new THREE.Vector2(originPoint.x, originPoint.y);
-      const rayDirectionLeft = new THREE.Vector2(dimensions.left, originPoint.y);
-      // rayDirectionLeft.normalize();
+      const rayOrigin = new THREE.Vector3(originPoint.x, originPoint.y, 0);
 
-      // console.log('cubes => ', cubes)
-      raycaster.set(rayOrigin, rayDirectionLeft);
-      const instersects = raycaster.intersectObjects(cubes);
-      // console.log('instersects => ', instersects)
+      const raycasterLeft = new THREE.Raycaster();
+      const rayDirectionLeft = new THREE.Vector3(-2 , 0, 0).normalize();
 
+      const raycasterTop = new THREE.Raycaster();
+      const rayDirectionTop = new THREE.Vector3(0, 2, 0).normalize();
+
+      const raycasterRight = new THREE.Raycaster();
+      const rayDirectionRight = new THREE.Vector3(2, 0, 0).normalize();
+
+      const raycasterBottom = new THREE.Raycaster();
+      const rayDirectionBottom = new THREE.Vector3(0, -2, 0).normalize();
       
+      raycasterLeft.set(rayOrigin, rayDirectionLeft);
+      raycasterTop.set(rayOrigin, rayDirectionTop);
+      raycasterRight.set(rayOrigin, rayDirectionRight);
+      raycasterBottom.set(rayOrigin, rayDirectionBottom);
 
-      console.log(event.object.position.x);
-      console.log(event.object.position.y);
+      const instersectsLeft = raycasterLeft.intersectObjects(cubes);
+      const instersectsTop = raycasterTop.intersectObjects(cubes);
+      const instersectsRight = raycasterRight.intersectObjects(cubes);
+      const instersectsBottom = raycasterBottom.intersectObjects(cubes);
       
+      scene.add(new THREE.ArrowHelper(raycasterLeft.ray.direction, raycasterLeft.ray.origin, 500, 0xff0000) );
+      scene.add(new THREE.ArrowHelper(raycasterTop.ray.direction, raycasterTop.ray.origin, 500, 0xff0000) );
+      scene.add(new THREE.ArrowHelper(raycasterRight.ray.direction, raycasterRight.ray.origin, 500, 0xff0000) );
+      scene.add(new THREE.ArrowHelper(raycasterBottom.ray.direction, raycasterBottom.ray.origin, 500, 0xff0000) );
+
+      const intersectsResults = [];
       
+      if(instersectsLeft.length > 0){
+        intersectsResults.push('L')
+      }
+      if(instersectsTop.length > 0){
+        intersectsResults.push('T')
+      }
+      if(instersectsRight.length > 0){
+        intersectsResults.push('R')
+      }
+      if(instersectsBottom.length > 0){
+        intersectsResults.push('B')
+      }
 
-      // Cast a ray
-    // var originPoint = event.object.position.clone();
-    // const rayOrigin = new THREE.Vector3(originPoint.x, originPoint.y, 0);
-    // // // event.object.position.x - cubeSize * 2
-    // const rayDirectionLeft = new THREE.Vector3(dimensions.left, originPoint.y, 0);
-    // rayDirectionLeft.normalize();
-
-    //   console.log('cubes => ', cubes)
-    //   raycaster.set(rayOrigin, rayDirectionLeft);
-    //   const instersects = raycaster.intersectObjects(cubes);
-
-      // let k;
-      // let cubesPos = [];
-
-      // for(k = 0; k < cubes.length; k++){
-      //     let currCube = cubes[k];
-
-      //     let outObj = {
-      //       x : currCube.position.x,
-      //       y: currCube.position.y,
-      //       z: currCube.position.z
-      //     }
-
-      //     cubesPos.push(outObj);
+      cube.userData.intersects = intersectsResults;
+      // let l, t, r, b;
+      // for(l = 0; l < instersectsLeft.length; l++){
+      //   const currIntersect = instersectsLeft[l];
+      //   console.log("Left : ", currIntersect.object.userData.color);
       // }
 
-      // console.log("cubes ==> ", cubesPos);
+      // for(t = 0; t < instersectsTop.length; t++){
+      //   const currIntersect = instersectsTop[t];
+      //   console.log("Top : ", currIntersect.object.userData.color);
+      // }
 
-      
+      // for(r = 0; r < instersectsRight.length; r++){
+      //   const currIntersect = instersectsRight[r];
+      //   console.log("Right : ", currIntersect.object.userData.color);
+      // }
 
-      // console.log("instersects ==> ", instersects, instersects.length);
-
-      
-      // let l;
-      // for(l = 0; l < instersects.length; l++){
-      //   const currIntersect = instersects[l];
-      //   console.log(currIntersect.object.userData.color);
-        // console.groupCollapsed("instersected == ");
-        // console.log(currIntersect.object);
-        // console.log(currIntersect.object.userData.color);
-        // console.groupEnd();
-        // currIntersect.object.userData.setColor(rubik_colors.green);
+      // for(b = 0; b < instersectsBottom.length; b++){
+      //   const currIntersect = instersectsBottom[b];
+      //   console.log("Bottom : ", currIntersect.object.userData.color);
       // }
       
+      // scene.add(new THREE.ArrowHelper(raycasterLeft.ray.direction, raycasterLeft.ray.origin, 500, 0xff0000) );
+      cube.userData.update(cube);
       controls.enabled = false;
      });
      
      dragControls.addEventListener ( 'drag', function( event ){
-      console.log('drag');
+      // console.log('drag');
       event.object.position.z = 0; // This will prevent moving z axis, but will be on 0 line. change this to your object position of z axis.
      })
 
      dragControls.addEventListener( 'dragend', function ( event ) {
-      console.log('drag end');
+      // console.log('drag end');
       // event.object.userData.setMetalness(0);
       controls.enabled = true;
       // console.log('event.object.userData.color', event.object.userData);
-      event.object.userData.setColor(rubik_colors[event.object.userData.color]);
+      // event.object.userData.setColor(rubik_colors[event.object.userData.color]);
       renderer.render( scene, camera );
      });
 
-     scene.add(new THREE.GridHelper(10, 10));
+     var standardPlaneNormal   = new THREE.Vector3(0, 0, 1);
+    var GridHelperPlaneNormal = new THREE.Vector3(0, 1, 0);
+    
+    var quaternion  = new THREE.Quaternion();
+    quaternion.setFromUnitVectors(standardPlaneNormal, GridHelperPlaneNormal);
+    var largeGridGuide = new THREE.GridHelper(10, 10);
+    let gameBoardGuide = new THREE.GridHelper(5, 5, "aqua", "aqua");
+    // grid.position.y = 0.01;
 
-    let grid = new THREE.GridHelper(5, 5, "aqua", "aqua");
-    grid.position.y = 0.01;
-    scene.add(grid);
-    scene.add(gridGroup);
+    largeGridGuide.rotation.setFromQuaternion(quaternion);
+    gameBoardGuide.rotation.setFromQuaternion(quaternion);
+
+
+    scene.add(largeGridGuide);
+    scene.add(gameBoardGuide);
+
+    scene.add(gameBoard);
+    
   }
 
   animation = (time) => {
     const radius = 10;
     const angle = 0;
     cubes.forEach(o => {
-      o.userData.update();
+      o.userData.update(o);
     });
 
     // camera.position.x = radius * Math.cos( angle ); 
@@ -318,6 +331,9 @@ class App extends React.Component {
     camera.position.z = 6;
     scene = new THREE.Scene();
 
+    //looks in the center of the scene since that where we always start when creating a scene. 0,0,0
+    camera.lookAt(scene.position);
+
     geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
 
     material = new THREE.MeshNormalMaterial({
@@ -336,7 +352,6 @@ class App extends React.Component {
 
     const axisHelper = new THREE.AxesHelper();
     scene.add(axisHelper);
-
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
 
@@ -363,6 +378,7 @@ class App extends React.Component {
   };
 
   render() {
+    
     return (
     <>
     <div className="webgl"></div>
