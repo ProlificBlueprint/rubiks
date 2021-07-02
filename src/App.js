@@ -29,7 +29,7 @@ const cusrsor = {
 
 const gui = new dat.GUI();
 
-class App extends React.Component {
+class App extends Component {
   constructor() {
     super();
     this.state = { sizes: {
@@ -139,27 +139,41 @@ class App extends React.Component {
           let cube_limit = {};
 
           if($this.userData.intersects.length > 0){
-            const hasCollitionLeft = $this.userData.intersects.includes("L");
-            const hasCollitionBottom = $this.userData.intersects.includes("B");
-            const hasCollitionRight = $this.userData.intersects.includes("R");
-            const hasCollitionTop = $this.userData.intersects.includes("T");
-            console.log("hasCollitionBottom => ", hasCollitionBottom);
+            let dataIntersects = $this.userData.intersects;
+            // const hasCollitionLeft = Object.keys(dataIntersects).includes("L");
+            // const hasCollitionBottom = Object.keys(dataIntersects).includes("B");
+            // const hasCollitionRight = Object.keys(dataIntersects).includes("R");
+            // const hasCollitionTop = Object.keys(dataIntersects).includes("T");
 
-            const xMin = hasCollitionLeft ? $this.userData.position.x : -1 * cub2
-            // console.log('$this.userData.position.y ==> ', $this.userData.position.y)
-            const yMin = hasCollitionBottom ? $this.userData.position.y : -1 * cub2
-            const xMax = hasCollitionRight ? $this.userData.position.x :  cub2
-            const yMax = hasCollitionTop ? $this.userData.position.y :  cub2
+            const TopLimit = dataIntersects.find( obj => Object.keys(obj).includes("T"));
+            const RightLimit = dataIntersects.find( obj => Object.keys(obj).includes("R"));
+            const BottomLimit = dataIntersects.find( obj => Object.keys(obj).includes("B"));
+            const LeftLimit = dataIntersects.find( obj => Object.keys(obj).includes("L"));
+
+
+            const xMin = LeftLimit ? LeftLimit.L : -1 * cub2;
+            const yMin = BottomLimit ? BottomLimit.B : -1 * cub2;
+            const xMax = RightLimit ? RightLimit.R : cub2;
+            const yMax = TopLimit ? TopLimit.T : cub2;
+
+            // console.log("Intersects ", xMax, yMax);
+            // console.log("T => ", instersectsTop);
+            // console.log("R => ", instersectsRight);
+            // console.log("B => ", instersectsBottom);
+            // console.log("L => ", instersectsLeft);
+      
 
             cube_limit.max = new THREE.Vector3(xMax, yMax, 0);
             cube_limit.min = new THREE.Vector3(xMin, yMin, 0);
           } else {
+
             cube_limit.min = new THREE.Vector3(-1 * cub2, -1 * cub2, 0);
             cube_limit.max = new THREE.Vector3(cub2, cub2, 0);
           }
 
-          console.log("cube_limit.min", cube_limit.min)
-          console.log("cube_limit.max", cube_limit.max)
+          // console.log("cube_limit.min", cube_limit.min)
+          // console.log("cube_limit.max", cube_limit.max)
+          // console.log('cLAMP => , ' , cube_limit.min)
           cube.position.clamp(cube_limit.min, cube_limit.max);
         }
         
@@ -183,6 +197,10 @@ class App extends React.Component {
 
     gui.add(gameBoard.position, 'x', 0).name('grid x');
     gui.add(gameBoard.position, 'y', 0).name('grid y');
+
+    /*
+       DRAG CONTROLS
+     */
 
     dragControls = new DragControls(cubes, camera, renderer.domElement);
     
@@ -211,102 +229,135 @@ class App extends React.Component {
       raycasterRight.set(rayOrigin, rayDirectionRight);
       raycasterBottom.set(rayOrigin, rayDirectionBottom);
 
-      const instersectsLeft = raycasterLeft.intersectObjects(cubes);
-      const instersectsTop = raycasterTop.intersectObjects(cubes);
-      const instersectsRight = raycasterRight.intersectObjects(cubes);
-      const instersectsBottom = raycasterBottom.intersectObjects(cubes);
+      const instersectsLeft = raycasterLeft.intersectObjects(cubes).filter((mesh) => mesh.object.userData.color != undefined);
+      const instersectsTop = raycasterTop.intersectObjects(cubes).filter((mesh) => mesh.object.userData.color != undefined);
+      const instersectsRight = raycasterRight.intersectObjects(cubes).filter((mesh) => mesh.object.userData.color != undefined);
+      const instersectsBottom = raycasterBottom.intersectObjects(cubes).filter((mesh) => mesh.object.userData.color != undefined);
       
       scene.add(new THREE.ArrowHelper(raycasterLeft.ray.direction, raycasterLeft.ray.origin, 500, 0xff0000) );
       scene.add(new THREE.ArrowHelper(raycasterTop.ray.direction, raycasterTop.ray.origin, 500, 0xff0000) );
       scene.add(new THREE.ArrowHelper(raycasterRight.ray.direction, raycasterRight.ray.origin, 500, 0xff0000) );
       scene.add(new THREE.ArrowHelper(raycasterBottom.ray.direction, raycasterBottom.ray.origin, 500, 0xff0000) );
 
-      const intersectsResults = [];
-      
-      if(instersectsLeft.length > 0){
-        intersectsResults.push('L')
-      }
+      let intersectsResults = [];
+
+     
       if(instersectsTop.length > 0){
-        console.log(instersectsTop);
-        const closeIntersections = instersectsTop.filter( intersect => intersect.distance <= .5);
+        const closeIntersections = instersectsTop.filter( intersect => intersect.distance <= .50);
+      
         if(closeIntersections.length > 0) {
-          console.log('Top Colllision Close!')
-          intersectsResults.push('T')
+          intersectsResults.push({'T' : originPoint.y })
+        } else {
+          if(instersectsTop.length > 0){
+            intersectsResults.push({ "T" : originPoint.y +  instersectsTop[0].distance - cubeSize/2 })
+          } else {
+            //
+          }
         }
       }
+
       if(instersectsRight.length > 0){
-        intersectsResults.push('R')
-      }
-      if(instersectsBottom.length > 0){
-        const closeIntersections = instersectsBottom.filter( intersect => intersect.distance <= .5);
+        const closeIntersections = instersectsRight.filter( intersect => intersect.distance <= .50);
         if(closeIntersections.length > 0) {
-          console.log('Bottom Colllision Close!')
-          intersectsResults.push('B');
+          intersectsResults.push({'R' : originPoint.x})
+        } else {
+          if(instersectsRight.length > 0){
+            // console.log("instersectsRight =", instersectsRight);
+            intersectsResults.push({ "R" : originPoint.x + instersectsRight[0].distance - cubeSize/2})
+          }
+        }
+      }
+
+      if(instersectsBottom.length > 0){
+        const closeIntersections = instersectsBottom.filter( intersect => intersect.distance <= .50);
+
+        if(closeIntersections.length > 0) {
+          intersectsResults.push({'B' : originPoint.y});
+        } else {
+          if(instersectsBottom.length > 0){
+            intersectsResults.push({"B" : originPoint.y -  instersectsBottom[0].distance + cubeSize/2})
+          }
+        }
+      }
+
+      if(instersectsLeft.length > 0){
+        const closeIntersections = instersectsLeft.filter( intersect => intersect.distance <= .50);
+
+        if(closeIntersections.length > 0) {
+          intersectsResults.push({'L' : originPoint.x })
+        } else {
+          if(instersectsLeft.length > 0 ){
+            console.log("instersectsLeft => ", instersectsLeft);
+            intersectsResults.push({ "L" : originPoint.x - instersectsLeft[0].distance + cubeSize/2 })
+          }
         }
       }
 
       cube.userData.intersects = intersectsResults;
-      // let l, t, r, b;
-      // for(l = 0; l < instersectsLeft.length; l++){
-      //   const currIntersect = instersectsLeft[l];
-      //   console.log("Left : ", currIntersect.object.userData.color);
-      // }
 
-      // for(t = 0; t < instersectsTop.length; t++){
-      //   const currIntersect = instersectsTop[t];
-      //   console.log("Top : ", currIntersect.object.userData.color);
-      // }
 
-      // for(r = 0; r < instersectsRight.length; r++){
-      //   const currIntersect = instersectsRight[r];
-      //   console.log("Right : ", currIntersect.object.userData.color);
-      // }
+      // // let l, t, r, b;
+      // // for(l = 0; l < instersectsLeft.length; l++){
+      // //   const currIntersect = instersectsLeft[l];
+      // //   console.log("Left : ", currIntersect.object.userData.color);
+      // // }
 
-      // for(b = 0; b < instersectsBottom.length; b++){
-      //   const currIntersect = instersectsBottom[b];
-      //   console.log("Bottom : ", currIntersect.object.userData.color);
-      // }
+      // // for(t = 0; t < instersectsTop.length; t++){
+      // //   const currIntersect = instersectsTop[t];
+      // //   console.log("Top : ", currIntersect.object.userData.color);
+      // // }
+
+      // // for(r = 0; r < instersectsRight.length; r++){
+      // //   const currIntersect = instersectsRight[r];
+      // //   console.log("Right : ", currIntersect.object.userData.color);
+      // // }
+
+      // // for(b = 0; b < instersectsBottom.length; b++){
+      // //   const currIntersect = instersectsBottom[b];
+      // //   console.log("Bottom : ", currIntersect.object.userData.color);
+      // // }
       
-      // scene.add(new THREE.ArrowHelper(raycasterLeft.ray.direction, raycasterLeft.ray.origin, 500, 0xff0000) );
+      // // scene.add(new THREE.ArrowHelper(raycasterLeft.ray.direction, raycasterLeft.ray.origin, 500, 0xff0000) );
       cube.userData.update(cube);
       controls.enabled = false;
      });
      
+
+
      dragControls.addEventListener ( 'drag', function( event ){
-      // console.log('dragging');
       let cube = event.object;
       
       var originPoint = cube.position.clone();
-      const rayOrigin = new THREE.Vector3(originPoint.x, originPoint.y, 0);
+      // const rayOrigin = new THREE.Vector3(originPoint.x, originPoint.y, 0);
 
-      const raycasterLeft = new THREE.Raycaster();
-      const rayDirectionLeft = new THREE.Vector3(-2 , 0, 0).normalize();
+      // const raycasterLeft = new THREE.Raycaster();
+      // const rayDirectionLeft = new THREE.Vector3(-2 , 0, 0).normalize();
 
-      const raycasterTop = new THREE.Raycaster();
-      const rayDirectionTop = new THREE.Vector3(0, 2, 0).normalize();
+      // const raycasterTop = new THREE.Raycaster();
+      // const rayDirectionTop = new THREE.Vector3(0, 2, 0).normalize();
 
-      const raycasterRight = new THREE.Raycaster();
-      const rayDirectionRight = new THREE.Vector3(2, 0, 0).normalize();
+      // const raycasterRight = new THREE.Raycaster();
+      // const rayDirectionRight = new THREE.Vector3(2, 0, 0).normalize();
 
-      const raycasterBottom = new THREE.Raycaster();
-      const rayDirectionBottom = new THREE.Vector3(0, -2, 0).normalize();
+      // const raycasterBottom = new THREE.Raycaster();
+      // const rayDirectionBottom = new THREE.Vector3(0, -2, 0).normalize();
       
-      raycasterLeft.set(rayOrigin, rayDirectionLeft);
-      raycasterTop.set(rayOrigin, rayDirectionTop);
-      raycasterRight.set(rayOrigin, rayDirectionRight);
-      raycasterBottom.set(rayOrigin, rayDirectionBottom);
+      // raycasterLeft.set(rayOrigin, rayDirectionLeft);
+      // raycasterTop.set(rayOrigin, rayDirectionTop);
+      // raycasterRight.set(rayOrigin, rayDirectionRight);
+      // raycasterBottom.set(rayOrigin, rayDirectionBottom);
 
-      const instersectsLeft = raycasterLeft.intersectObjects(cubes);
-      const instersectsTop = raycasterTop.intersectObjects(cubes);
-      const instersectsRight = raycasterRight.intersectObjects(cubes);
-      const instersectsBottom = raycasterBottom.intersectObjects(cubes);
+      // const instersectsLeft = raycasterLeft.intersectObjects(cubes);
+      // const instersectsTop = raycasterTop.intersectObjects(cubes);
+      // const instersectsRight = raycasterRight.intersectObjects(cubes);
+      // const instersectsBottom = raycasterBottom.intersectObjects(cubes);
       
       // scene.add(new THREE.ArrowHelper(raycasterLeft.ray.direction, raycasterLeft.ray.origin, 500, 0xff0000) );
       // scene.add(new THREE.ArrowHelper(raycasterTop.ray.direction, raycasterTop.ray.origin, 500, 0xff0000) );
       // scene.add(new THREE.ArrowHelper(raycasterRight.ray.direction, raycasterRight.ray.origin, 500, 0xff0000) );
       // scene.add(new THREE.ArrowHelper(raycasterBottom.ray.direction, raycasterBottom.ray.origin, 500, 0xff0000) );
 
-      const intersectsResults = [];
+      // const intersectsResults = [];
       
       // if(instersectsLeft.length > 0){
       //   intersectsResults.push('L')
@@ -323,16 +374,16 @@ class App extends React.Component {
       //   intersectsResults.push('R')
       // }
       // console.log("instersectsBottom = ", instersectsBottom)
-      if(instersectsBottom.length > 0){
-        const closeIntersections = instersectsBottom.filter( intersect => intersect.distance <= .5);
+      // if(instersectsBottom.length > 0){
+      //   const closeIntersections = instersectsBottom.filter( intersect => intersect.distance <= .5);
 
-        if(closeIntersections.length > 0) {
-          intersectsResults.push('B');
-        }
-      }
+      //   if(closeIntersections.length > 0) {
+      //     intersectsResults.push('B');
+      //   }
+      // }
 
-      cube.userData.intersects = intersectsResults;
-      cube.userData.update(cube);
+      // cube.userData.intersects = intersectsResults;
+      // cube.userData.update(cube);
 
       event.object.position.z = 0; // This will prevent moving z axis, but will be on 0 line. change this to your object position of z axis.
      })
@@ -343,10 +394,16 @@ class App extends React.Component {
       controls.enabled = true;
       // console.log('event.object.userData.color', event.object.userData);
       // event.object.userData.setColor(rubik_colors[event.object.userData.color]);
-      const cube = event.object;
-      cube.userData.position = cube.position.clone();
+      // const cube = event.object;
+      // cube.userData.position = cube.position.clone();
       renderer.render( scene, camera );
      });
+
+
+
+     /*
+     END DRAG CONTROLS
+     */
 
      var standardPlaneNormal   = new THREE.Vector3(0, 0, 1);
     var GridHelperPlaneNormal = new THREE.Vector3(0, 1, 0);
@@ -412,8 +469,8 @@ class App extends React.Component {
     // group1.add(cube1);
     // // group1.add(cube2);
 
-    const axisHelper = new THREE.AxesHelper();
-    scene.add(axisHelper);
+    // const axisHelper = new THREE.AxesHelper();
+    // scene.add(axisHelper);
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
 
