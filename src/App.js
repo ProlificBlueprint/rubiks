@@ -1,23 +1,27 @@
 import React, { Component } from "react";
 import "./App.css";
 import * as THREE from "three";
-import gsap from "gsap";
+// import gsap from "gsap";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { DragControls } from "three/examples/jsm/controls/DragControls";
 import { shuffle, isWinningCombination } from "./helper/helper";
 import { rubik_colors, color_opt_array } from "./cubes/colors";
-import * as dat from "dat.gui";
+import { getIntersectionsOfSelectedSq, getAvailableSqByDirection} from './helper/intersects';
+// import {generateGameboardCubes} from './cubes/gameboard';
+
+// import * as dat from "dat.gui";
 const metalTexture = require('./assets/metal.jpg');
 
 console.log(metalTexture);
 // debuger
-const gui = new dat.GUI({ closed: true });
+// const gui = new dat.GUI({ closed: true });
 
 // global
 let camera, dragControls, scene, renderer, appEl;
 let controls;
 let cubes = [];
 let master_cubes = [];
+let game_pieces;
 
 let master_game_map = new Map();
 const board_game_map = new Map();
@@ -30,7 +34,6 @@ const board_game_map_row1 = new Map();
 const board_game_map_row2 = new Map();
 const board_game_map_row3 = new Map();
 
-
 master_game_map.set(0, game_map_row1);
 master_game_map.set(1, game_map_row2);
 master_game_map.set(2, game_map_row3);
@@ -40,16 +43,11 @@ board_game_map.set(1, board_game_map_row2);
 board_game_map.set(2, board_game_map_row3);
 
 const gridGap = 0.01;
-const masterGridGap = 0.001;
+// const masterGridGap = 0.001;
 const gridCount = 5;
 let cubeSize = 1;
 const masterCubeSize = cubeSize / 2;
 const masterGridCount = 3;
-
-const app_dimensions = {
-  width: window.innerWidth,
-  height: window.innerHeight,
-};
 
 class App extends Component {
   constructor() {
@@ -62,13 +60,69 @@ class App extends Component {
 
     this.init();
     this.bindResize();
+    this.bindKeyPress();
+  }
+
+
+  bindKeyPress = () => {
+    let currCube;
+    window.addEventListener("keydown", function(e) {
+      switch(e.which) {
+          case 37: // left
+          // console.log('go left');
+          getAvailableSqByDirection(cubes, "L", scene);
+          break;
+  
+          case 38: // up
+          // console.log('go up');
+          getAvailableSqByDirection(cubes, "T", scene);
+          break;
+  
+          case 39: // right
+          // console.log('go right');
+          getAvailableSqByDirection(cubes, "R", scene);
+          break;
+  
+          case 40: // down
+          // console.log('go down');
+          getAvailableSqByDirection(cubes, "B", scene);
+          break;
+  
+          default: return; // exit this handler for other keys
+      }
+
+      e.preventDefault(); // prevent the default action (scroll / move caret)
+      // console.log("board_game_map ", board_game_map);
+      // console.log("master_game_map", master_game_map);
+
+      const currentBoard = game_pieces.children;
+
+          currentBoard.filter((p) => {
+            const piecePosition = p.position.clone();
+            const x = Math.round(piecePosition.x);
+            const y = Math.round(piecePosition.y);
+
+            const i_whitelist = [0, 1, -1];
+            const j_whitelist = [0, 1, -1];
+
+            if (i_whitelist.includes(x) && j_whitelist.includes(y)) {
+              const board_game_row = board_game_map.get(x + 1);
+              board_game_row.set(y + 1, p.userData.color);
+            }
+          })
+
+      if (isWinningCombination(board_game_map, master_game_map)) {
+        alert(" You Win!");
+      }
+
+    });
   }
 
   bindResize = () => {
     window.addEventListener("resize", (e) => {
-      camera.aspect = app_dimensions.width / app_dimensions.height;
+      camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(app_dimensions.width, app_dimensions.height);
+      renderer.setSize(window.innerWidth, window.innerHeight);
     });
   };
 
@@ -102,6 +156,7 @@ class App extends Component {
       }
     }
 
+    // update for faster comparison
     master_game_map = this.syncMasterCubOrder(master_game_map);
     master_game_board_group.position.x = 4;
     master_game_board_group.position.y = 4;
@@ -159,7 +214,7 @@ class App extends Component {
   };
 
   generateCubes = () => {
-    const game_pieces = new THREE.Group();
+    game_pieces = new THREE.Group();
     const cube_geometry = new THREE.BoxGeometry(
       cubeSize - gridGap,
       cubeSize - gridGap,
@@ -187,6 +242,7 @@ class App extends Component {
         cube.userData.intersects = [];
         cube.userData.position = cube.position.clone();
 
+        // prototype
         cube.userData.update = ($this) => {
           let cube_limit = {};
 
@@ -222,7 +278,6 @@ class App extends Component {
           cube.position.clamp(cube_limit.min, cube_limit.max);
         };
 
-        // prototype
         cube.userData.setColor = (color) => {
           cube.material.color.setHex(color);
         };
@@ -239,7 +294,6 @@ class App extends Component {
             const j_whitelist = [0, 1, -1];
 
             if (i_whitelist.includes(x) && j_whitelist.includes(y)) {
-              // New
               const board_game_row = board_game_map.get(x + 1);
               board_game_row.set(y + 1, p.userData.color);
             }
@@ -255,8 +309,7 @@ class App extends Component {
         if (i !== 4 || j !== 4) {
           game_pieces.add(cube);
         }
-
-
+        
         count++;
       }
     }
@@ -277,107 +330,109 @@ class App extends Component {
 
       let cube = event.object;
       var originPoint = cube.position.clone();
-      const rayOrigin = new THREE.Vector3(originPoint.x, originPoint.y, 0);
+      // const rayOrigin = new THREE.Vector3(originPoint.x, originPoint.y, 0);
 
-      const raycasterLeft = new THREE.Raycaster();
-      const rayDirectionLeft = new THREE.Vector3(-2, 0, 0).normalize();
+      // const raycasterLeft = new THREE.Raycaster();
+      // const rayDirectionLeft = new THREE.Vector3(-2, 0, 0).normalize();
 
-      const raycasterTop = new THREE.Raycaster();
-      const rayDirectionTop = new THREE.Vector3(0, 2, 0).normalize();
+      // const raycasterTop = new THREE.Raycaster();
+      // const rayDirectionTop = new THREE.Vector3(0, 2, 0).normalize();
 
-      const raycasterRight = new THREE.Raycaster();
-      const rayDirectionRight = new THREE.Vector3(2, 0, 0).normalize();
+      // const raycasterRight = new THREE.Raycaster();
+      // const rayDirectionRight = new THREE.Vector3(2, 0, 0).normalize();
 
-      const raycasterBottom = new THREE.Raycaster();
-      const rayDirectionBottom = new THREE.Vector3(0, -2, 0).normalize();
+      // const raycasterBottom = new THREE.Raycaster();
+      // const rayDirectionBottom = new THREE.Vector3(0, -2, 0).normalize();
 
-      raycasterLeft.set(rayOrigin, rayDirectionLeft);
-      raycasterTop.set(rayOrigin, rayDirectionTop);
-      raycasterRight.set(rayOrigin, rayDirectionRight);
-      raycasterBottom.set(rayOrigin, rayDirectionBottom);
+      // raycasterLeft.set(rayOrigin, rayDirectionLeft);
+      // raycasterTop.set(rayOrigin, rayDirectionTop);
+      // raycasterRight.set(rayOrigin, rayDirectionRight);
+      // raycasterBottom.set(rayOrigin, rayDirectionBottom);
 
-      const instersectsLeft = raycasterLeft
-        .intersectObjects(cubes)
-        .filter((mesh) => mesh.object.userData.color != undefined);
-      const instersectsTop = raycasterTop
-        .intersectObjects(cubes)
-        .filter((mesh) => mesh.object.userData.color != undefined);
-      const instersectsRight = raycasterRight
-        .intersectObjects(cubes)
-        .filter((mesh) => mesh.object.userData.color != undefined);
-      const instersectsBottom = raycasterBottom
-        .intersectObjects(cubes)
-        .filter((mesh) => mesh.object.userData.color != undefined);
+      // const instersectsLeft = raycasterLeft
+      //   .intersectObjects(cubes)
+      //   .filter((mesh) => mesh.object.userData.color !== undefined);
+      // const instersectsTop = raycasterTop
+      //   .intersectObjects(cubes)
+      //   .filter((mesh) => mesh.object.userData.color !== undefined);
+      // const instersectsRight = raycasterRight
+      //   .intersectObjects(cubes)
+      //   .filter((mesh) => mesh.object.userData.color !== undefined);
+      // const instersectsBottom = raycasterBottom
+      //   .intersectObjects(cubes)
+      //   .filter((mesh) => mesh.object.userData.color !== undefined);
 
-      let intersectsResults = [];
+      // let intersectsResults = [];
 
-      if (instersectsTop.length > 0) {
-        const closeIntersections = instersectsTop.filter(
-          (intersect) => intersect.distance <= 0.5
-        );
+      // if (instersectsTop.length > 0) {
+      //   const closeIntersections = instersectsTop.filter(
+      //     (intersect) => intersect.distance <= 0.5
+      //   );
 
-        if (closeIntersections.length > 0) {
-          intersectsResults.push({ T: originPoint.y });
-        } else {
-          if (instersectsTop.length > 0) {
-            intersectsResults.push({
-              T: originPoint.y + instersectsTop[0].distance - cubeSize / 2,
-            });
-          } else {
-            //
-          }
-        }
-      }
+      //   if (closeIntersections.length > 0) {
+      //     intersectsResults.push({ T: originPoint.y });
+      //   } else {
+      //     if (instersectsTop.length > 0) {
+      //       intersectsResults.push({
+      //         T: originPoint.y + instersectsTop[0].distance - cubeSize / 2,
+      //       });
+      //     } else {
+      //       //
+      //     }
+      //   }
+      // }
 
-      if (instersectsRight.length > 0) {
-        const closeIntersections = instersectsRight.filter(
-          (intersect) => intersect.distance <= 0.5
-        );
-        if (closeIntersections.length > 0) {
-          intersectsResults.push({ R: originPoint.x });
-        } else {
-          if (instersectsRight.length > 0) {
-            // console.log("instersectsRight =", instersectsRight);
-            intersectsResults.push({
-              R: originPoint.x + instersectsRight[0].distance - cubeSize / 2,
-            });
-          }
-        }
-      }
+      // if (instersectsRight.length > 0) {
+      //   const closeIntersections = instersectsRight.filter(
+      //     (intersect) => intersect.distance <= 0.5
+      //   );
+      //   if (closeIntersections.length > 0) {
+      //     intersectsResults.push({ R: originPoint.x });
+      //   } else {
+      //     if (instersectsRight.length > 0) {
+      //       // console.log("instersectsRight =", instersectsRight);
+      //       intersectsResults.push({
+      //         R: originPoint.x + instersectsRight[0].distance - cubeSize / 2,
+      //       });
+      //     }
+      //   }
+      // }
 
-      if (instersectsBottom.length > 0) {
-        const closeIntersections = instersectsBottom.filter(
-          (intersect) => intersect.distance <= 0.5
-        );
+      // if (instersectsBottom.length > 0) {
+      //   const closeIntersections = instersectsBottom.filter(
+      //     (intersect) => intersect.distance <= 0.5
+      //   );
 
-        if (closeIntersections.length > 0) {
-          intersectsResults.push({ B: originPoint.y });
-        } else {
-          if (instersectsBottom.length > 0) {
-            intersectsResults.push({
-              B: originPoint.y - instersectsBottom[0].distance + cubeSize / 2,
-            });
-          }
-        }
-      }
+      //   if (closeIntersections.length > 0) {
+      //     intersectsResults.push({ B: originPoint.y });
+      //   } else {
+      //     if (instersectsBottom.length > 0) {
+      //       intersectsResults.push({
+      //         B: originPoint.y - instersectsBottom[0].distance + cubeSize / 2,
+      //       });
+      //     }
+      //   }
+      // }
 
-      if (instersectsLeft.length > 0) {
-        const closeIntersections = instersectsLeft.filter(
-          (intersect) => intersect.distance <= 0.5
-        );
+      // if (instersectsLeft.length > 0) {
+      //   const closeIntersections = instersectsLeft.filter(
+      //     (intersect) => intersect.distance <= 0.5
+      //   );
 
-        if (closeIntersections.length > 0) {
-          intersectsResults.push({ L: originPoint.x });
-        } else {
-          if (instersectsLeft.length > 0) {
-            intersectsResults.push({
-              L: originPoint.x - instersectsLeft[0].distance + cubeSize / 2,
-            });
-          }
-        }
-      }
+      //   if (closeIntersections.length > 0) {
+      //     intersectsResults.push({ L: originPoint.x });
+      //   } else {
+      //     if (instersectsLeft.length > 0) {
+      //       intersectsResults.push({
+      //         L: originPoint.x - instersectsLeft[0].distance + cubeSize / 2,
+      //       });
+      //     }
+      //   }
+      // }
 
-      cube.userData.intersects = intersectsResults;
+      // intersectsResults = getIntersectionsOfSelectedSq(originPoint, cubes);
+      
+      cube.userData.intersects = getIntersectionsOfSelectedSq(originPoint, cubes);
       cube.userData.update(cube);
       controls.enabled = false;
     });
@@ -394,6 +449,9 @@ class App extends Component {
       // console.log('event.object.userData.color', event.object.userData);
       // event.object.userData.setColor(rubik_colors[event.object.userData.color]);
       const cube = event.object;
+      // const clonePos = event.object.position.clone();
+      // cube.position.x = clonePos.x;
+      // cube.position.y = clonePos.y;
       // cube.userData.position = cube.position.clone();
       cube.userData.checkMatchGrid();
       renderer.render(scene, camera);
@@ -424,9 +482,44 @@ class App extends Component {
     controls.enableDamping = true;
     // gsap.to(cube1.position, { duration: 1, delay: 1, x: 2})
     this.generateCubes();
+    // generateGameboardCubes(scene, camera, renderer, controls);
     this.generateMasterCubes();
     this.generateGridHelper();
 
+    // const material = new THREE.LineDashedMaterial({
+    //   color: 0x000000,
+    //   scale: 2,
+    //   dashSize: 3,
+    //   gapSize: 1,
+    //   linewidth: 3
+    // });
+
+
+    const material = new THREE.LineBasicMaterial( {
+      color: 0x000000,
+      linewidth: 4,
+      linecap: 'round', //ignored by WebGLRenderer
+      linejoin:  'round' //ignored by WebGLRenderer
+    } );
+    
+    const points = [];
+    points.push( new THREE.Vector3( -1.1, -1.1, 1.01 ) );
+    points.push( new THREE.Vector3( -1.1, 1.1, 1.01 ) );
+    points.push( new THREE.Vector3( 1.1, 1.1, 1.01 ) );
+    points.push( new THREE.Vector3( 1.1, -1.1, 1.01 ) );
+    points.push( new THREE.Vector3( -1.1, -1.1, 1.01 ) );
+    
+    const geometry = new THREE.BufferGeometry().setFromPoints( points );
+    
+    const line = new THREE.Line( geometry, material );
+    
+
+    // var scaleVector = new THREE.Vector3();
+    // var scaleFactor = 1;
+    // var scale = scaleVector.subVectors(cubes, camera.position).length() / scaleFactor;
+    // line.scale.set(scale, scale, 1); 
+    // scene.add( line );
+    // line.geometry.scale(1, 1, 1)
     appEl.appendChild(renderer.domElement);
   };
 

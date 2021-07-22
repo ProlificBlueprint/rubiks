@@ -9,7 +9,7 @@ let master_cubes = [];
 let cubeSize = 1;
 const gridGap = 0.01;
 const gridCount = 5;
-const masterGridGap = 0.001;
+// const masterGridGap = 0.001;
 const masterGridCount = 3;
 const masterCubeSize = cubeSize/2;
 
@@ -145,8 +145,6 @@ const generateGameboardCubes = (scene, camera, renderer, controls) => {
             cube_limit.min = new THREE.Vector3(-1 * doubleCubeSize, -1 * doubleCubeSize, 0);
             cube_limit.max = new THREE.Vector3(doubleCubeSize, doubleCubeSize, 0);
           }
-
-          console.log('cube_limit => ', cube_limit)
           //
           cube.position.clamp(cube_limit.min, cube_limit.max);
         };
@@ -220,16 +218,16 @@ const generateGameboardCubes = (scene, camera, renderer, controls) => {
 
       const instersectsLeft = raycasterLeft
         .intersectObjects(cubes)
-        .filter((mesh) => mesh.object.userData.color != undefined);
+        .filter((mesh) => mesh.object.userData.color !== undefined);
       const instersectsTop = raycasterTop
         .intersectObjects(cubes)
-        .filter((mesh) => mesh.object.userData.color != undefined);
+        .filter((mesh) => mesh.object.userData.color !== undefined);
       const instersectsRight = raycasterRight
         .intersectObjects(cubes)
-        .filter((mesh) => mesh.object.userData.color != undefined);
+        .filter((mesh) => mesh.object.userData.color !== undefined);
       const instersectsBottom = raycasterBottom
         .intersectObjects(cubes)
-        .filter((mesh) => mesh.object.userData.color != undefined);
+        .filter((mesh) => mesh.object.userData.color !== undefined);
 
       let intersectsResults = [];
 

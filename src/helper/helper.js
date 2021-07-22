@@ -1,11 +1,6 @@
 const isObjEq = (m1, m2) => {
   if (!m1 || !m2) return false;
-  for (var [key, val] of m1) {
-    const m2Val = m2.get(key);
-    if (val !== m2Val) {
-      return false;
-    }
-  }
+  for (var [key, value] of m1) { if (value !== m2.get(key)) return false; }
   return true;
 }
 
