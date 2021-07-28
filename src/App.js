@@ -1,18 +1,16 @@
 import React, { Component } from "react";
 import "./App.css";
 import * as THREE from "three";
+import * as _ from 'lodash';
 // import gsap from "gsap";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { DragControls } from "three/examples/jsm/controls/DragControls";
 import { shuffle, isWinningCombination } from "./helper/helper";
 import { rubik_colors, color_opt_array } from "./cubes/colors";
-import { getIntersectionsOfSelectedSq, getAvailableSqByDirection} from './helper/intersects';
-// import {generateGameboardCubes} from './cubes/gameboard';
+import { getDraggableIntersectionsOfSelectedSq, getAvailableSqByDirection } from './helper/intersects';
+import {generateGameboardCubes, generateMasterCubes} from './cubes/gameboard';
+import { generateMasterCubeDisplay } from './controls/controls';
 
-// import * as dat from "dat.gui";
-const metalTexture = require('./assets/metal.jpg');
-
-console.log(metalTexture);
 // debuger
 // const gui = new dat.GUI({ closed: true });
 
@@ -20,30 +18,29 @@ console.log(metalTexture);
 let camera, dragControls, scene, renderer, appEl;
 let controls;
 let cubes = [];
-let master_cubes = [];
-let game_pieces;
+let masterCubes = [];
+let masterCubesHTML;
+let gamePieces;
 
-let master_game_map = new Map();
-const board_game_map = new Map();
+let masterGameMap = new Map();
+const boardGameMap = new Map();
 
 const game_map_row1 = new Map();
 const game_map_row2 = new Map();
 const game_map_row3 = new Map();
 
-const board_game_map_row1 = new Map();
-const board_game_map_row2 = new Map();
-const board_game_map_row3 = new Map();
+const boardGameMap_row1 = new Map();
+const boardGameMap_row2 = new Map();
+const boardGameMap_row3 = new Map();
 
-master_game_map.set(0, game_map_row1);
-master_game_map.set(1, game_map_row2);
-master_game_map.set(2, game_map_row3);
+masterGameMap.set(0, game_map_row1);
+masterGameMap.set(1, game_map_row2);
+masterGameMap.set(2, game_map_row3);
 
-board_game_map.set(0, board_game_map_row1);
-board_game_map.set(1, board_game_map_row2);
-board_game_map.set(2, board_game_map_row3);
+boardGameMap.set(0, boardGameMap_row1);
+boardGameMap.set(1, boardGameMap_row2);
+boardGameMap.set(2, boardGameMap_row3);
 
-const gridGap = 0.01;
-// const masterGridGap = 0.001;
 const gridCount = 5;
 let cubeSize = 1;
 const masterCubeSize = cubeSize / 2;
@@ -52,69 +49,61 @@ const masterGridCount = 3;
 class App extends Component {
   constructor() {
     super();
-    this.state = {};
+    this.state = {
+      masterCubeArr: []
+    };
   }
 
   componentDidMount() {
     appEl = document.getElementsByClassName("webgl")[0];
-
     this.init();
     this.bindResize();
     this.bindKeyPress();
   }
 
-
   bindKeyPress = () => {
-    let currCube;
-    window.addEventListener("keydown", function(e) {
-      switch(e.which) {
-          case 37: // left
-          // console.log('go left');
-          getAvailableSqByDirection(cubes, "L", scene);
-          break;
-  
-          case 38: // up
-          // console.log('go up');
-          getAvailableSqByDirection(cubes, "T", scene);
-          break;
-  
-          case 39: // right
-          // console.log('go right');
-          getAvailableSqByDirection(cubes, "R", scene);
-          break;
-  
-          case 40: // down
-          // console.log('go down');
-          getAvailableSqByDirection(cubes, "B", scene);
-          break;
-  
-          default: return; // exit this handler for other keys
+    window.addEventListener("keydown", (e) => {
+      e.preventDefault();
+      
+      let isAnimating = false;
+
+      if (!this.debouncedFn) {
+        this.debouncedFn = _.debounce((key) => {
+          switch (key) {
+            case 'ArrowLeft': // left
+              getAvailableSqByDirection(cubes, "L");
+              this.checkCombinationMatches();
+              isAnimating = false;
+              break;
+
+            case 'ArrowUp': // up
+              getAvailableSqByDirection(cubes, "T");
+              this.checkCombinationMatches();
+              isAnimating = false;
+              break;
+
+            case 'ArrowRight': // right
+              getAvailableSqByDirection(cubes, "R");
+              this.checkCombinationMatches();
+              isAnimating = false;
+              break;
+
+            case 'ArrowDown': // down
+              getAvailableSqByDirection(cubes, "B");
+              this.checkCombinationMatches();
+              isAnimating = false;
+              break;
+
+            default: return; // exit this handler
+          }
+        }, 100);
       }
 
-      e.preventDefault(); // prevent the default action (scroll / move caret)
-      // console.log("board_game_map ", board_game_map);
-      // console.log("master_game_map", master_game_map);
-
-      const currentBoard = game_pieces.children;
-
-          currentBoard.filter((p) => {
-            const piecePosition = p.position.clone();
-            const x = Math.round(piecePosition.x);
-            const y = Math.round(piecePosition.y);
-
-            const i_whitelist = [0, 1, -1];
-            const j_whitelist = [0, 1, -1];
-
-            if (i_whitelist.includes(x) && j_whitelist.includes(y)) {
-              const board_game_row = board_game_map.get(x + 1);
-              board_game_row.set(y + 1, p.userData.color);
-            }
-          })
-
-      if (isWinningCombination(board_game_map, master_game_map)) {
-        alert(" You Win!");
+      if(!isAnimating) {
+        isAnimating = true;
+        this.debouncedFn(e.key);
       }
-
+      
     });
   }
 
@@ -127,8 +116,8 @@ class App extends Component {
   };
 
   generateMasterCubes = () => {
-    const master_game_board_group = new THREE.Group();
-    const master_cube_geometry = new THREE.BoxGeometry(
+    const masterGameBoardGroup = new THREE.Group();
+    const masterCubeGeometry = new THREE.BoxGeometry(
       masterCubeSize,
       masterCubeSize,
       0.1
@@ -144,27 +133,30 @@ class App extends Component {
         let material = new THREE.MeshBasicMaterial({
           color: randomColors[count],
         });
-        const cube = new THREE.Mesh(master_cube_geometry, material);
+        const cube = new THREE.Mesh(masterCubeGeometry, material);
         cube.position.x = -1 * i * masterCubeSize;
         cube.position.y = -1 * j * masterCubeSize;
-        master_cubes.push(cube);
-        master_game_board_group.add(cube);
+        masterCubes.push(cube);
+        // masterGameBoardGroup.add(cube);
 
-        const game_row = master_game_map.get(i);
-        game_row.set(j, randomColors[count])
+        const gameRow = masterGameMap.get(i);
+        gameRow.set(j, randomColors[count])
         count++;
       }
     }
 
     // update for faster comparison
-    master_game_map = this.syncMasterCubOrder(master_game_map);
-    master_game_board_group.position.x = 4;
-    master_game_board_group.position.y = 4;
-    scene.add(master_game_board_group);
+    masterGameMap = this.syncMasterCubeOrder(masterGameMap);
+    const cubeArr = generateMasterCubeDisplay(masterGameMap);
+    this.setState({ masterCubeArr : cubeArr });
+
+    // masterGameBoardGroup.position.x = .5;
+    // masterGameBoardGroup.position.y = 8;
+    // scene.add(masterGameBoardGroup);
   };
 
-  syncMasterCubOrder = (master_cubes) => {
-    const outObj = master_cubes;
+  syncMasterCubeOrder = (masterCubes) => {
+    const outObj = masterCubes;
 
     outObj.forEach(map => {
       const value0 = map.get(0);
@@ -185,19 +177,13 @@ class App extends Component {
     var quaternion = new THREE.Quaternion();
     quaternion.setFromUnitVectors(standardPlaneNormal, GridHelperPlaneNormal);
 
-    var master_quaternion = new THREE.Quaternion();
-    master_quaternion.setFromUnitVectors(standardPlaneNormal, GridHelperPlaneMaster);
+    var masterQuaternion = new THREE.Quaternion();
+    masterQuaternion.setFromUnitVectors(standardPlaneNormal, GridHelperPlaneMaster);
 
     var largeGridGuide = new THREE.GridHelper(10, 10);
     largeGridGuide.rotation.setFromQuaternion(quaternion);
 
-    // let game_piecesGuide = new THREE.GridHelper(3, 3, "aqua", "aqua");
-    // game_piecesGuide.position.x = 4;
-    // game_piecesGuide.position.y = 4;
-    // game_piecesGuide.rotation.setFromQuaternion(quaternion);
-
     scene.add(largeGridGuide);
-    // scene.add(game_piecesGuide);
   }
 
   animation = (_time) => {
@@ -205,19 +191,33 @@ class App extends Component {
       o.userData.update(o);
     });
 
-    // const radius = 10;
-    // const angle = 0;
-    // camera.position.x = radius * Math.cos( angle );
-    // camera.position.y = radius * Math.cos( angle );
     controls.update();
     renderer.render(scene, camera);
   };
 
+  checkCombinationMatches = () => {
+    gamePieces.children.filter((p) => {
+      const piecePos = p.position.clone();
+      const x = Math.round(piecePos.x);
+      const y = Math.round(piecePos.y);
+      const whitelist = [0, 1, -1];
+
+      if (whitelist.includes(x) && whitelist.includes(y)) {
+        const currentBoardRow = boardGameMap.get(x + 1);
+        currentBoardRow.set(y + 1, p.userData.color);
+      }
+    })
+    
+    if (isWinningCombination(boardGameMap, masterGameMap)) {
+      console.log(" You Win!");
+    }
+  }
+
   generateCubes = () => {
-    game_pieces = new THREE.Group();
+    gamePieces = new THREE.Group();
     const cube_geometry = new THREE.BoxGeometry(
-      cubeSize - gridGap,
-      cubeSize - gridGap,
+      cubeSize,
+      cubeSize,
       0.1
     );
 
@@ -249,18 +249,10 @@ class App extends Component {
           if ($this.userData.intersects.length > 0) {
             let dataIntersects = $this.userData.intersects;
 
-            const TopLimit = dataIntersects.find((obj) =>
-              Object.keys(obj).includes("T")
-            );
-            const RightLimit = dataIntersects.find((obj) =>
-              Object.keys(obj).includes("R")
-            );
-            const BottomLimit = dataIntersects.find((obj) =>
-              Object.keys(obj).includes("B")
-            );
-            const LeftLimit = dataIntersects.find((obj) =>
-              Object.keys(obj).includes("L")
-            );
+            const TopLimit = dataIntersects.find((obj) => Object.keys(obj).includes("T"));
+            const RightLimit = dataIntersects.find((obj) => Object.keys(obj).includes("R"));
+            const BottomLimit = dataIntersects.find((obj) => Object.keys(obj).includes("B"));
+            const LeftLimit = dataIntersects.find((obj) => Object.keys(obj).includes("L"));
 
             const xMin = LeftLimit ? LeftLimit.L : -1 * doubleCubeSize;
             const yMin = BottomLimit ? BottomLimit.B : -1 * doubleCubeSize;
@@ -282,41 +274,21 @@ class App extends Component {
           cube.material.color.setHex(color);
         };
 
-        cube.userData.checkMatchGrid = () => {
-          const currentBoard = game_pieces.children;
-
-          currentBoard.filter((p) => {
-            const piecePosition = p.position.clone();
-            const x = Math.round(piecePosition.x);
-            const y = Math.round(piecePosition.y);
-
-            const i_whitelist = [0, 1, -1];
-            const j_whitelist = [0, 1, -1];
-
-            if (i_whitelist.includes(x) && j_whitelist.includes(y)) {
-              const board_game_row = board_game_map.get(x + 1);
-              board_game_row.set(y + 1, p.userData.color);
-            }
-          })
-
-          if (isWinningCombination(board_game_map, master_game_map)) {
-            alert(" You Win!");
-          }
+        cube.userData.checkCombinationMatches = () => {
+          this.checkCombinationMatches();
         }
 
         cubes.push(cube);
 
         if (i !== 4 || j !== 4) {
-          game_pieces.add(cube);
+          gamePieces.add(cube);
         }
-        
+
         count++;
       }
     }
 
-    // gui.add(game_pieces.position, "x", 0).name("grid x");
-    // gui.add(game_pieces.position, "y", 0).name("grid y");
-    scene.add(game_pieces);
+    scene.add(gamePieces);
 
     /*
        DRAG CONTROLS
@@ -330,109 +302,8 @@ class App extends Component {
 
       let cube = event.object;
       var originPoint = cube.position.clone();
-      // const rayOrigin = new THREE.Vector3(originPoint.x, originPoint.y, 0);
 
-      // const raycasterLeft = new THREE.Raycaster();
-      // const rayDirectionLeft = new THREE.Vector3(-2, 0, 0).normalize();
-
-      // const raycasterTop = new THREE.Raycaster();
-      // const rayDirectionTop = new THREE.Vector3(0, 2, 0).normalize();
-
-      // const raycasterRight = new THREE.Raycaster();
-      // const rayDirectionRight = new THREE.Vector3(2, 0, 0).normalize();
-
-      // const raycasterBottom = new THREE.Raycaster();
-      // const rayDirectionBottom = new THREE.Vector3(0, -2, 0).normalize();
-
-      // raycasterLeft.set(rayOrigin, rayDirectionLeft);
-      // raycasterTop.set(rayOrigin, rayDirectionTop);
-      // raycasterRight.set(rayOrigin, rayDirectionRight);
-      // raycasterBottom.set(rayOrigin, rayDirectionBottom);
-
-      // const instersectsLeft = raycasterLeft
-      //   .intersectObjects(cubes)
-      //   .filter((mesh) => mesh.object.userData.color !== undefined);
-      // const instersectsTop = raycasterTop
-      //   .intersectObjects(cubes)
-      //   .filter((mesh) => mesh.object.userData.color !== undefined);
-      // const instersectsRight = raycasterRight
-      //   .intersectObjects(cubes)
-      //   .filter((mesh) => mesh.object.userData.color !== undefined);
-      // const instersectsBottom = raycasterBottom
-      //   .intersectObjects(cubes)
-      //   .filter((mesh) => mesh.object.userData.color !== undefined);
-
-      // let intersectsResults = [];
-
-      // if (instersectsTop.length > 0) {
-      //   const closeIntersections = instersectsTop.filter(
-      //     (intersect) => intersect.distance <= 0.5
-      //   );
-
-      //   if (closeIntersections.length > 0) {
-      //     intersectsResults.push({ T: originPoint.y });
-      //   } else {
-      //     if (instersectsTop.length > 0) {
-      //       intersectsResults.push({
-      //         T: originPoint.y + instersectsTop[0].distance - cubeSize / 2,
-      //       });
-      //     } else {
-      //       //
-      //     }
-      //   }
-      // }
-
-      // if (instersectsRight.length > 0) {
-      //   const closeIntersections = instersectsRight.filter(
-      //     (intersect) => intersect.distance <= 0.5
-      //   );
-      //   if (closeIntersections.length > 0) {
-      //     intersectsResults.push({ R: originPoint.x });
-      //   } else {
-      //     if (instersectsRight.length > 0) {
-      //       // console.log("instersectsRight =", instersectsRight);
-      //       intersectsResults.push({
-      //         R: originPoint.x + instersectsRight[0].distance - cubeSize / 2,
-      //       });
-      //     }
-      //   }
-      // }
-
-      // if (instersectsBottom.length > 0) {
-      //   const closeIntersections = instersectsBottom.filter(
-      //     (intersect) => intersect.distance <= 0.5
-      //   );
-
-      //   if (closeIntersections.length > 0) {
-      //     intersectsResults.push({ B: originPoint.y });
-      //   } else {
-      //     if (instersectsBottom.length > 0) {
-      //       intersectsResults.push({
-      //         B: originPoint.y - instersectsBottom[0].distance + cubeSize / 2,
-      //       });
-      //     }
-      //   }
-      // }
-
-      // if (instersectsLeft.length > 0) {
-      //   const closeIntersections = instersectsLeft.filter(
-      //     (intersect) => intersect.distance <= 0.5
-      //   );
-
-      //   if (closeIntersections.length > 0) {
-      //     intersectsResults.push({ L: originPoint.x });
-      //   } else {
-      //     if (instersectsLeft.length > 0) {
-      //       intersectsResults.push({
-      //         L: originPoint.x - instersectsLeft[0].distance + cubeSize / 2,
-      //       });
-      //     }
-      //   }
-      // }
-
-      // intersectsResults = getIntersectionsOfSelectedSq(originPoint, cubes);
-      
-      cube.userData.intersects = getIntersectionsOfSelectedSq(originPoint, cubes);
+      cube.userData.intersects = getDraggableIntersectionsOfSelectedSq(originPoint, cubes);
       cube.userData.update(cube);
       controls.enabled = false;
     });
@@ -443,18 +314,9 @@ class App extends Component {
     });
 
     dragControls.addEventListener("dragend", function (event) {
-      // console.log('drag end');
-      // event.object.userData.setMetalness(0);
       controls.enabled = true;
-      // console.log('event.object.userData.color', event.object.userData);
-      // event.object.userData.setColor(rubik_colors[event.object.userData.color]);
-      const cube = event.object;
-      // const clonePos = event.object.position.clone();
-      // cube.position.x = clonePos.x;
-      // cube.position.y = clonePos.y;
-      // cube.userData.position = cube.position.clone();
-      cube.userData.checkMatchGrid();
       renderer.render(scene, camera);
+      
     });
 
     /*
@@ -463,69 +325,48 @@ class App extends Component {
   };
 
   init = () => {
-    camera = new THREE.PerspectiveCamera(
-      90,
-      window.innerWidth / window.innerHeight,
-      0.01,
-      100
-    );
-
+    camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.01, 100);
     camera.position.z = 10;
     scene = new THREE.Scene();
-    camera.lookAt(scene.position);
+    
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
     renderer.setAnimationLoop(this.animation);
-    //
+
     controls = new OrbitControls(camera, appEl);
     controls.enableDamping = true;
-    // gsap.to(cube1.position, { duration: 1, delay: 1, x: 2})
+    
     this.generateCubes();
+    
     // generateGameboardCubes(scene, camera, renderer, controls);
-    this.generateMasterCubes();
-    this.generateGridHelper();
-
-    // const material = new THREE.LineDashedMaterial({
-    //   color: 0x000000,
-    //   scale: 2,
-    //   dashSize: 3,
-    //   gapSize: 1,
-    //   linewidth: 3
-    // });
-
-
-    const material = new THREE.LineBasicMaterial( {
-      color: 0x000000,
-      linewidth: 4,
-      linecap: 'round', //ignored by WebGLRenderer
-      linejoin:  'round' //ignored by WebGLRenderer
-    } );
+    this.generateMasterCubes(scene);
+    // this.generateGridHelper();
     
-    const points = [];
-    points.push( new THREE.Vector3( -1.1, -1.1, 1.01 ) );
-    points.push( new THREE.Vector3( -1.1, 1.1, 1.01 ) );
-    points.push( new THREE.Vector3( 1.1, 1.1, 1.01 ) );
-    points.push( new THREE.Vector3( 1.1, -1.1, 1.01 ) );
-    points.push( new THREE.Vector3( -1.1, -1.1, 1.01 ) );
-    
-    const geometry = new THREE.BufferGeometry().setFromPoints( points );
-    
-    const line = new THREE.Line( geometry, material );
-    
-
-    // var scaleVector = new THREE.Vector3();
-    // var scaleFactor = 1;
-    // var scale = scaleVector.subVectors(cubes, camera.position).length() / scaleFactor;
-    // line.scale.set(scale, scale, 1); 
-    // scene.add( line );
-    // line.geometry.scale(1, 1, 1)
     appEl.appendChild(renderer.domElement);
   };
 
   render() {
     return (
       <>
+        <div className="gameControls">
+            <div className="masterGrid">
+              {this.state.masterCubeArr ? this.state.masterCubeArr.map((color, i) => {
+                console.log("Color : ", color);
+                return <div key={i} className={color}></div>
+              }) : 'Loading'}
+              {/* <div className={masterCubeArr[5]}></div>
+              <div className={masterCubeArr[2]}></div>
+      
+              <div className={masterCubeArr[7]}></div>
+              <div className={masterCubeArr[4]}></div>
+              <div className={masterCubeArr[1]}></div>
+      
+              <div className={masterCubeArr[6]}></div>
+              <div className={masterCubeArr[3]}></div>
+              <div className={masterCubeArr[0]}></div> */}
+          </div>
+        </div>
         <div className="webgl"></div>
       </>
     );
