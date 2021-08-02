@@ -1,0 +1,39 @@
+.red {
+    background-color: red;
+  }
+  
+  .blue {
+    background-color: blue;
+  }
+  
+  .orange {
+    background-color: orange;
+  }
+  
+  .white {
+    background-color: white;
+  }
+  
+  .green {
+    background-color: green;
+  }
+  
+  .yellow {
+    background-color: yellow;
+  }
+
+
+.masterGrid {
+    position: absolute;
+    right:0;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    border:2px solid rgba(255,255,255,.3);
+    height:100px;
+    width:100px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    top: 0;
+    transform: translate(-20px, 50%);
+  }
+  

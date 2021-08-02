@@ -1,5 +1,5 @@
 import React, { Component } from "react";
-import "./App.css";
+import './styles/App.scss';
 import * as THREE from "three";
 import * as _ from 'lodash';
 // import gsap from "gsap";
@@ -10,6 +10,7 @@ import { rubik_colors, color_opt_array } from "./cubes/colors";
 import { getDraggableIntersectionsOfSelectedSq, getAvailableSqByDirection } from './helper/intersects';
 import {generateGameboardCubes, generateMasterCubes} from './cubes/gameboard';
 import { generateMasterCubeDisplay } from './controls/controls';
+import { BsChevronDown, BsChevronLeft, BsChevronRight, BsChevronUp } from 'react-icons/bs';
 
 // debuger
 // const gui = new dat.GUI({ closed: true });
@@ -116,12 +117,12 @@ class App extends Component {
   };
 
   generateMasterCubes = () => {
-    const masterGameBoardGroup = new THREE.Group();
-    const masterCubeGeometry = new THREE.BoxGeometry(
-      masterCubeSize,
-      masterCubeSize,
-      0.1
-    );
+    // const masterGameBoardGroup = new THREE.Group();
+    // const masterCubeGeometry = new THREE.BoxGeometry(
+    //   masterCubeSize,
+    //   masterCubeSize,
+    //   0.1
+    // );
 
     let count = 0;
     let i, j;
@@ -130,14 +131,13 @@ class App extends Component {
 
     for (i = 0; i < masterGridCount; i++) {
       for (j = 0; j < masterGridCount; j++) {
-        let material = new THREE.MeshBasicMaterial({
-          color: randomColors[count],
-        });
-        const cube = new THREE.Mesh(masterCubeGeometry, material);
-        cube.position.x = -1 * i * masterCubeSize;
-        cube.position.y = -1 * j * masterCubeSize;
-        masterCubes.push(cube);
-        // masterGameBoardGroup.add(cube);
+        // let material = new THREE.MeshBasicMaterial({
+        //   color: randomColors[count],
+        // });
+        // const cube = new THREE.Mesh(masterCubeGeometry, material);
+        // cube.position.x = -1 * i * masterCubeSize;
+        // cube.position.y = -1 * j * masterCubeSize;
+        masterCubes.push(randomColors[count]);
 
         const gameRow = masterGameMap.get(i);
         gameRow.set(j, randomColors[count])
@@ -326,10 +326,11 @@ class App extends Component {
 
   init = () => {
     camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.01, 100);
-    camera.position.z = 10;
+    camera.position.z = 5;
     scene = new THREE.Scene();
     
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    // renderer.setClearColor( 0x000000, 0 ); // the default
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
     renderer.setAnimationLoop(this.animation);
@@ -349,24 +350,31 @@ class App extends Component {
   render() {
     return (
       <>
+
         <div className="gameControls">
-            <div className="masterGrid">
-              {this.state.masterCubeArr ? this.state.masterCubeArr.map((color, i) => {
-                console.log("Color : ", color);
-                return <div key={i} className={color}></div>
-              }) : 'Loading'}
-              {/* <div className={masterCubeArr[5]}></div>
-              <div className={masterCubeArr[2]}></div>
-      
-              <div className={masterCubeArr[7]}></div>
-              <div className={masterCubeArr[4]}></div>
-              <div className={masterCubeArr[1]}></div>
-      
-              <div className={masterCubeArr[6]}></div>
-              <div className={masterCubeArr[3]}></div>
-              <div className={masterCubeArr[0]}></div> */}
-          </div>
+        <div className="move_block_direction">
+			<div className="direction_content">
+				<div className="direction_div top_direction">
+        {<BsChevronUp/>}
+				</div>
+				<div className="direction_div left_direction">
+        {<BsChevronLeft/>}
+				</div>
+				<div className="direction_div bottom_direction">
+        {<BsChevronDown/>}
+				</div>
+				<div className="direction_div right_direction">
+        {<BsChevronRight/>}
+				</div>
+			</div>
+		</div>
+
         </div>
+        <div className="masterGrid">
+              {this.state.masterCubeArr ? this.state.masterCubeArr.map((color, i) => {
+                return <div key={i} className={color}></div>
+              }) : 'Loading.. .'}
+          </div>
         <div className="webgl"></div>
       </>
     );
