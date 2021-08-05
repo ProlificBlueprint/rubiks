@@ -3,16 +3,79 @@ $button-pad: $button-size/2;
 
 .gameControls {
     // width:calc(100wh - 42px);
-    // position: fixed;
+    position: fixed;
     // z-index: 9999;
-    // bottom:0;
-    // left:0;
-    // right:0;
+    bottom:0;
+    left:0;
+    right:0;
+    
     // padding: 40px;
     // height:100px;
-    background:rgba(255,255,255,.5);
-    border:1px solid red;
-  }
+    // background:rgba(255,255,255,.5);
+    // border:1px solid red;
+
+    .direction_content {
+        width:130px;
+        padding: 10px;
+        margin: 0 0 0 auto;
+        display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-auto-rows: minmax(40px, auto);
+    grid-template-areas:
+      "cTopLeft cTopLeft   tp    cTopRight   cTopRight"
+      "lt centerEmpty   centerEmpty    centerEmpty   rt"
+      "cBtmLeft cBtmLeft   bt   cBtmRight   cBtmRight";
+    }
+    .direction_div{
+        // position:absolute;
+        width: 20px;
+        height: 20px;
+        padding: 10px;
+        color:white;
+        background: transparent;
+        border:1px solid rgba(255,255,255,.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-radius: 50%;
+
+        &:focus, &:focus-visible, &:focus-within {
+            border:1px solid red;
+            background: green;
+            border:1px solid red;
+        }
+    }
+}
+
+.topLeftCorner {
+    grid-area: cTopLeft;
+}
+.topRightCorner {
+    grid-area: cTopRight;
+}
+.bottomLeftcorner {
+    grid-area: cBtmLeft;
+}
+.bottomRightCorner {
+    grid-area: cBtmRight;
+}
+
+.centerEmpty {
+    grid-area: centerEmpty;
+}
+
+.left_direction {
+    grid-area: lt;
+}
+.right_direction {
+    grid-area: rt;
+}
+.bottom_direction {
+    grid-area: bt;
+}
+.top_direction {
+    grid-area: tp;
+}
   
 //   .move_block_direction{
 //       background-color: sandybrown;
@@ -44,25 +107,25 @@ $button-pad: $button-size/2;
   
   /*left*/
   
-  .left_direction {
-      top: calc(50% - 20px);
-      left: 10px; 
-  }
-  /*right*/
-  .right_direction{
-      top: calc(50% - 20px);
-      right: 10px;
-  }
+//   .left_direction {
+//       top: calc(50% - 20px);
+//       left: 10px; 
+//   }
+//   /*right*/
+//   .right_direction{
+//       top: calc(50% - 20px);
+//       right: 10px;
+//   }
   
-  /*bottom*/
-  .bottom_direction{
-      bottom:10px;
-      left: calc(50% - 20px);
-  }
-  /*top*/
-  .top_direction{
-      top: 10px;
-      left: calc(50% - 20px);
-  }
+//   /*bottom*/
+//   .bottom_direction{
+//       bottom:10px;
+//       left: calc(50% - 20px);
+//   }
+//   /*top*/
+//   .top_direction{
+//       top: 10px;
+//       left: calc(50% - 20px);
+//   }
   
   

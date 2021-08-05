@@ -16,5 +16,36 @@ background: linear-gradient(to top, #2C5364, #203A43, #0F2027); /* W3C, IE 10+/ 
 
 html, body {
   overflow: hidden;
+  height:100%;
 }
 
+.webgl {
+  position: fixed;
+  top:30px;
+  bottom:0;
+  right:0;
+  left:0;
+  z-index: -1;
+}
+
+.header {
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  padding: 30px 20px;
+  font-size: 20px;
+  // margin-bottom: 20px;
+}
+
+.timer {
+  color: white;
+  // position: absolute;
+  //   top: 60px;
+  //   left: 20px;
+    font-size: 30px;
+    font-weight: 900;
+}
+
+.count {
+
+}
