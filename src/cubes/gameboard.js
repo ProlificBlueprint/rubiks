@@ -7,9 +7,7 @@ let dragControls;
 let cubes = [];
 let master_cubes = [];
 let cubeSize = 1;
-const gridGap = 0.01;
 const gridCount = 5;
-// const masterGridGap = 0.001;
 const masterGridCount = 3;
 const masterCubeSize = cubeSize/2;
 
@@ -47,7 +45,7 @@ const syncMasterCubOrder = (master_cubes) => {
     })
 
     return outObj;
-  }
+}
 
 const generateMasterCubes = (scene) => {
     const master_game_board_group = new THREE.Group();
@@ -80,8 +78,8 @@ const generateMasterCubes = (scene) => {
     }
     
     master_game_map = syncMasterCubOrder(master_game_map);
-    master_game_board_group.position.x = 4;
-    master_game_board_group.position.y = 4;
+    master_game_board_group.position.x = 10;
+    master_game_board_group.position.y = 0;
     scene.add(master_game_board_group);
 };
 
@@ -89,8 +87,8 @@ const generateMasterCubes = (scene) => {
 const generateGameboardCubes = (scene, camera, renderer, controls) => {
     const game_pieces = new THREE.Group();
     const cube_geometry = new THREE.BoxGeometry(
-      cubeSize - gridGap,
-      cubeSize - gridGap,
+      cubeSize,
+      cubeSize,
       0.1
     );
 
