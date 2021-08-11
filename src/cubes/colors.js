@@ -1,5 +1,6 @@
 // const material = new THREE.MeshMatcapMaterial()
 // material.matcap = matcapTexture
+// import all matcap textures here
 
 const rubik_colors_hex = {
     blue: 0x0000ff,

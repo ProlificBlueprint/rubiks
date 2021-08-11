@@ -2,32 +2,27 @@ import React, { Component } from "react";
 import './styles/App.scss';
 import * as THREE from "three";
 import * as _ from 'lodash';
-// import Moment from 'react-moment';
-import moment from 'moment';
+
+import { FiMenu } from 'react-icons/fi';
 
 // import gsap from "gsap";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
-import { DragControls } from "three/examples/jsm/controls/DragControls";
-import { shuffle, isWinningCombination } from "./helper/helper";
+// import { DragControls } from "three/examples/jsm/controls/DragControls";
+
+
 import { rubik_colors, color_opt_array } from "./cubes/colors";
-import { getDraggableIntersectionsOfSelectedSq, getAvailableSqByDirection } from './helper/intersects';
-import { generateGameboardCubes, generateMasterCubes } from './cubes/gameboard';
-import { generateMasterCubeDisplay } from './controls/controls';
-import { BsChevronDown, BsChevronLeft, BsChevronRight, BsChevronUp } from 'react-icons/bs';
-import { FiMenu } from 'react-icons/fi';
+import Time from './components/time';
+import Controls from './components/controls';
 
 // debuger
 // const gui = new dat.GUI({ closed: true });
 
 // global
-let camera, dragControls, scene, renderer, appEl;
+let camera, scene, renderer, appEl;
 let controls;
 let cubes = [];
 let masterCubes = [];
-let masterCubesHTML;
 let gamePieces;
-let setInervalTimer;
-
 let masterGameMap = new Map();
 const boardGameMap = new Map();
 
@@ -47,18 +42,22 @@ boardGameMap.set(0, boardGameMap_row1);
 boardGameMap.set(1, boardGameMap_row2);
 boardGameMap.set(2, boardGameMap_row3);
 
-const gridCount = 5;
+
 let cubeSize = 1;
-const masterCubeSize = cubeSize / 2;
+const gridCount = 5;
 const masterGridCount = 3;
 
 class App extends Component {
   constructor() {
     super();
     this.state = {
-      startTime:0,
-      clock:0,
-      masterCubeArr: []
+      isClockRunning: false,
+      clock: 0,
+      masterCubeArr: [],
+      gamneCubes: [],
+      moveCount: 0,
+      isGameComplete: false,
+      isMenuOpen: false
     };
   }
 
@@ -67,111 +66,6 @@ class App extends Component {
     this.init();
     this.bindResize();
     this.bindKeyPress();
-  }
-
-  bindKeyPress = () => {
-    window.addEventListener("keydown", (e) => {
-      e.preventDefault();
-
-      let isAnimating = false;
-
-      if (!this.debouncedFn) {
-        this.debouncedFn = _.debounce((key) => {
-          switch (key) {
-            case 'ArrowLeft': // left
-              getAvailableSqByDirection(cubes, "L");
-              this.checkCombinationMatches();
-              isAnimating = false;
-              break;
-
-            case 'ArrowUp': // up
-              getAvailableSqByDirection(cubes, "T");
-              this.checkCombinationMatches();
-              isAnimating = false;
-              break;
-
-            case 'ArrowRight': // right
-              getAvailableSqByDirection(cubes, "R");
-              this.checkCombinationMatches();
-              isAnimating = false;
-              break;
-
-            case 'ArrowDown': // down
-              getAvailableSqByDirection(cubes, "B");
-              this.checkCombinationMatches();
-              isAnimating = false;
-              break;
-
-            default: return; // exit this handler
-          }
-        }, 100);
-      }
-
-      if (!isAnimating) {
-        isAnimating = true;
-        this.debouncedFn(e.key);
-      }
-
-    });
-  }
-
-  bindResize = () => {
-    window.addEventListener("resize", (e) => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-  };
-
-  generateMasterCubes = () => {
-    let count = 0;
-    let i, j;
-
-    const randomColors = shuffle(color_opt_array);
-
-    for (i = 0; i < masterGridCount; i++) {
-      for (j = 0; j < masterGridCount; j++) {
-        masterCubes.push(randomColors[count]);
-        masterGameMap.get(i).set(j, randomColors[count])
-        count++;
-      }
-    }
-
-    // update for faster comparison
-    masterGameMap = this.syncMasterCubeOrder(masterGameMap);
-    const cubeArr = generateMasterCubeDisplay(masterGameMap);
-    this.setState({ masterCubeArr: cubeArr });
-  };
-
-  syncMasterCubeOrder = (masterCubes) => {
-    const outObj = masterCubes;
-
-    outObj.forEach(map => {
-      const value0 = map.get(0);
-      const value2 = map.get(2);
-
-      map.set(0, value2);
-      map.set(2, value0);
-    })
-
-    return outObj;
-  }
-
-  generateGridHelper = () => {
-    var standardPlaneNormal = new THREE.Vector3(0, 0, 1);
-    var GridHelperPlaneNormal = new THREE.Vector3(0, 1, 0);
-    var GridHelperPlaneMaster = new THREE.Vector3(0, 1, 0);
-
-    var quaternion = new THREE.Quaternion();
-    quaternion.setFromUnitVectors(standardPlaneNormal, GridHelperPlaneNormal);
-
-    var masterQuaternion = new THREE.Quaternion();
-    masterQuaternion.setFromUnitVectors(standardPlaneNormal, GridHelperPlaneMaster);
-
-    var largeGridGuide = new THREE.GridHelper(10, 10);
-    largeGridGuide.rotation.setFromQuaternion(quaternion);
-
-    scene.add(largeGridGuide);
   }
 
   animation = (_time) => {
@@ -183,27 +77,120 @@ class App extends Component {
     renderer.render(scene, camera);
   };
 
+
+  bindResize = () => {
+    window.addEventListener("resize", (e) => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  };
+
+  bindKeyPress = () => {
+    window.addEventListener("keydown", (e) => {
+      e.preventDefault();
+      const dir = e.key;
+      this.moveGamePieceByDirection(dir);
+    });
+  }
+
+  directionalButtonPress = (e) => {
+    e.preventDefault();
+    const dir = e.target.getAttribute("data-direction");
+    this.moveGamePieceByDirection(dir);
+  }
+
+  generateMasterCubes = () => {
+    const cubeArr = generateMasterCubes(masterGameMap)
+    this.setState({ masterCubeArr: cubeArr });
+  };
+  
+  startClock = () => {
+    if (!this.state.isClockRunning) {
+      this.setState({ isClockRunning: true });
+    }
+  }
+
+  updateParentClockOnComplete = (time) => {
+    this.setState({ clock: time, isClockRunning: false });
+  }
+
+  moveGamePieceByDirection = (arrowDirection) => {
+    let isAnimating = false;
+
+    switch (arrowDirection) {
+      case 'ArrowLeft':
+        break;
+      case 'ArrowUp':
+        this.setState({ isAnimatingUp: true });
+        break;
+      default:
+        break; // exit this handler
+    }
+
+    if (!this.debouncedFn) {
+      this.debouncedFn = _.debounce((key) => {
+        switch (key) {
+          case 'ArrowLeft': // left
+            moveAvailableSqByDirection(cubes, "L");
+            this.setState({ moveCount: this.state.moveCount + 1 });
+            isAnimating = false;
+            break;
+
+          case 'ArrowUp': // up
+            this.setState({ moveCount: this.state.moveCount + 1 });
+            moveAvailableSqByDirection(cubes, "T");
+            isAnimating = false;
+            break;
+
+          case 'ArrowRight': // right
+            moveAvailableSqByDirection(cubes, "R");
+            this.setState({ moveCount: this.state.moveCount + 1 });
+            isAnimating = false;
+            break;
+
+          case 'ArrowDown': // down
+            moveAvailableSqByDirection(cubes, "B");
+            this.setState({ moveCount: this.state.moveCount + 1 });
+            isAnimating = false;
+            break;
+
+          default: return; // exit this handler
+        }
+      }, 110);
+    }
+
+    if (!isAnimating) {
+      isAnimating = true;
+      this.debouncedFn(arrowDirection);
+    }
+
+    this.startClock();
+  }  
+
   checkCombinationMatches = () => {
-    gamePieces.children.filter((p) => {
+    gamePieces.children.forEach((p) => {
       const piecePos = p.position.clone();
       const x = Math.round(piecePos.x);
       const y = Math.round(piecePos.y);
       const whitelist = [0, 1, -1];
 
       if (whitelist.includes(x) && whitelist.includes(y)) {
-        const currentBoardRow = boardGameMap.get(x + 1);
-        currentBoardRow.set(y + 1, p.userData.color);
+        // get current center of board game map
+        boardGameMap.get(x + 1).set(y + 1, p.userData.color);
       }
+      return null;
     })
 
     if (isWinningCombination(boardGameMap, masterGameMap)) {
-      console.log(" You Win!");
+      this.setState({ isGameComplete: true });
+      console.log(" You Win! moves : " + this.state.moveCount + " / Time : ", this.state.clock);
     }
   }
 
   generateCubes = () => {
     gamePieces = new THREE.Group();
-    
+
 
     const doubleCubeSize = cubeSize * 2;
     let count = 0;
@@ -223,10 +210,10 @@ class App extends Component {
         let yPos = -1 * j + cubeSize * 2;
 
         cube_geometry = new THREE.BoxGeometry(
-            cubeSize,
-            cubeSize,
-            0.1
-          );
+          cubeSize,
+          cubeSize,
+          0.1
+        );
 
         // let isX = xPos === 1 || xPos === 0 || xPos === -1;
         // let isY = yPos === 1 || yPos === 0 || yPos === -1;
@@ -244,7 +231,7 @@ class App extends Component {
         //     0.1
         //   );
         // }
-        
+
 
         const cube = new THREE.Mesh(cube_geometry, material);
         cube.position.x = xPos;
@@ -287,6 +274,7 @@ class App extends Component {
         };
 
         cube.userData.checkCombinationMatches = () => {
+          // console.log('Calling map on : ', this);
           this.checkCombinationMatches();
         }
 
@@ -306,59 +294,40 @@ class App extends Component {
        DRAG CONTROLS
      */
 
-    dragControls = new DragControls(cubes, camera, renderer.domElement);
+    // dragControls = new DragControls(cubes, camera, renderer.domElement);
 
-    dragControls.addEventListener("dragstart", function (event) {
-      // affect obj
-      // event.object.userData.setColor('0xff0000');
+    // dragControls.addEventListener("dragstart", function (event) {
+    //   // affect obj
+    //   // event.object.userData.setColor('0xff0000');
 
-      let cube = event.object;
-      var originPoint = cube.position.clone();
+    //   let cube = event.object;
+    //   var originPoint = cube.position.clone();
 
-      cube.userData.intersects = getDraggableIntersectionsOfSelectedSq(originPoint, cubes);
-      cube.userData.update(cube);
-      controls.enabled = false;
-    });
+    //   cube.userData.intersects = getDraggableIntersectionsOfSelectedSq(originPoint, cubes);
+    //   cube.userData.update(cube);
+    //   controls.enabled = false;
+    // });
 
-    dragControls.addEventListener("drag", function (event) {
-      let cube = event.object;
-      cube.position.z = 0; // This will prevent moving z axis, but will be on 0 line. change this to your object position of z axis.
-    });
+    // dragControls.addEventListener("drag", function (event) {
+    //   let cube = event.object;
+    //   cube.position.z = 0; // This will prevent moving z axis, but will be on 0 line. change this to your object position of z axis.
+    // });
 
-    dragControls.addEventListener("dragend", function (event) {
-      controls.enabled = true;
-      renderer.render(scene, camera);
+    // dragControls.addEventListener("dragend", function (event) {
+    //   controls.enabled = true;
+    //   renderer.render(scene, camera);
 
-    });
+    // });
 
     /*
      END DRAG CONTROLS
      */
   };
 
-  startClock = () => {
-    const startTime = parseInt(this.state.startTime, 10);
-    setInervalTimer = setInterval(()  => {
-      let startTime = parseInt(this.state.clock);
-      this.setState({ clock: startTime + 1 });
-    }, 1000); // update about every second
-    return setInervalTimer;
-  }
-
-  formatDoubleDigit = (time) => {
-    if(time < 10){
-      return `0${time}`
-    } else { 
-      return time;
-    };
-  }
-  parseClock = (time) => {
-    return time < 60 ?`00 : ${this.formatDoubleDigit(time)}` : `${this.formatDoubleDigit(Math.floor(time/60))} : ${this.formatDoubleDigit(time%60)}`;
-  }
 
   init = () => {
     camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.01, 100);
-    camera.position.z = 6;
+    camera.position.z = 7;
     scene = new THREE.Scene();
 
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -371,105 +340,43 @@ class App extends Component {
     controls.enableDamping = true;
 
     this.generateCubes();
-
-    // generateGameboardCubes(scene, camera, renderer, controls);
-    this.generateMasterCubes(scene);
-    // this.generateGridHelper();
-
-    this.startClock();
+    this.generateMasterCubes();
     appEl.appendChild(renderer.domElement);
   };
 
 
-  directionalButtonPress = (e) => {
-      let isAnimating = false;
-      const direction = e.target.getAttribute("data-direction") ;
-
-      if (!this.debouncedFn) {
-        this.debouncedFn = _.debounce((direction) => {
-          switch (direction) {
-            case 'ArrowLeft': // left
-              getAvailableSqByDirection(cubes, "L");
-              this.checkCombinationMatches();
-              isAnimating = false;
-              break;
-
-            case 'ArrowUp': // up
-              getAvailableSqByDirection(cubes, "T");
-              this.checkCombinationMatches();
-              isAnimating = false;
-              break;
-
-            case 'ArrowRight': // right
-              getAvailableSqByDirection(cubes, "R");
-              this.checkCombinationMatches();
-              isAnimating = false;
-              break;
-
-            case 'ArrowDown': // down
-              getAvailableSqByDirection(cubes, "B");
-              this.checkCombinationMatches();
-              isAnimating = false;
-              break;
-
-            default: return; // exit this handler
-          }
-        }, 100);
-      }
-
-      if (!isAnimating && direction) {
-        isAnimating = true;
-        this.debouncedFn(direction);
-      }
+  toggleMenu = () => {
+    this.setState({ isMenuOpen : !this.state.isMenuOpen })
   }
+  
 
   render() {
     return (
       <>
-
-      <div className="header">
-        <span className="title">Rubix</span> 
-
-        <div className="timer">
-          {this.parseClock(this.state.clock)}
+        <div className="header">
+          <span className="title">Rubix</span>
+          <Time isClockRunning={this.state.isClockRunning} isGameOver={this.state.isGameComplete} onGameComplete={this.updateParentClockOnComplete} />
+          <span className="menu" onClick={this.toggleMenu}>
+            <FiMenu />
+          </span>
         </div>
 
-      <FiMenu/>
-      </div>
-        
-        <div className="gameControls">
-          <div className="move_block_direction">
-            <div className="direction_content">
-              <div className="direction_div top_direction" onClick={this.directionalButtonPress} data-direction="ArrowUp">
-                {<BsChevronUp data-direction="ArrowUp" />}
-              </div>
-              <div className="direction_div left_direction" onClick={this.directionalButtonPress} data-direction="ArrowLeft">
-                {<BsChevronLeft data-direction="ArrowLeft" />}
-              </div>
-              <div className="direction_div bottom_direction" onClick={this.directionalButtonPress} data-direction="ArrowDown">
-                {<BsChevronDown data-direction="ArrowDown" />}
-              </div>
-              <div className="direction_div right_direction" onClick={this.directionalButtonPress} data-direction="ArrowRight">
-                {<BsChevronRight data-direction="ArrowRight" />}
-              </div>
-
-
-              <div className="centerEmpty"></div>
-              <div className="topLeftCorner"></div>
-              <div className="topRightCorner"></div>
-              <div className="bottomLeftcorner"></div>
-              <div className="bottomRightCorner"></div>
-
-            </div>
-          </div>
-
+        <div className="moves">
+          <section className="title">Moves</section>
+          <section className="count">{this.state.moveCount}</section>
         </div>
+
+        <Controls onMoveGamePieceByDirection={this.moveGamePieceByDirection} />
+
         <div className="masterGrid">
           {this.state.masterCubeArr ? this.state.masterCubeArr.map((color, i) => {
             return <div key={i} className={color}></div>
           }) : 'Loading.. .'}
         </div>
+
         <div className="webgl"></div>
+
+        {/* <button className={this.state.clockStarted ? 'start active' : 'start reset active' } onClick={this.resetAll}>{ this.state.clockStarted ? 'Restart' : 'Start'}</button> */}
       </>
     );
   }

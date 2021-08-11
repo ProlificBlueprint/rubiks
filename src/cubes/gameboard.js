@@ -11,8 +11,6 @@ const gridCount = 5;
 const masterGridCount = 3;
 const masterCubeSize = cubeSize/2;
 
-
-
 let master_game_map = new Map();
 const board_game_map = new Map();
 
