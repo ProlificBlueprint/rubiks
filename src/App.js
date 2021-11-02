@@ -8,6 +8,7 @@ import { FiMenu } from "react-icons/fi";
 // import gsap from "gsap";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 // import { DragControls } from "three/examples/jsm/controls/DragControls";
+import { GUI } from 'dat.gui';
 
 import {
   shuffle,
@@ -15,7 +16,7 @@ import {
   generateMasterCubes,
   moveAvailableSqByDirection,
 } from "./helper";
-import { rubik_colors, color_opt_array, rubik_matcaps } from "./cubes/colors";
+import { color_opt_array, rubik_colors, rubik_matcaps } from "./cubes/colors";
 import Time from "./components/time";
 import Controls from "./components/controls";
 
@@ -27,6 +28,7 @@ let camera, scene, renderer, appEl;
 let controls;
 let cubes = [];
 let gamePieces;
+let spotLight;
 let masterGameMap = new Map();
 const boardGameMap = new Map();
 
@@ -104,6 +106,8 @@ class App extends Component {
   }
 
   animation = (_time) => {
+    // spotLight.position.set(0, Math.cos(_time), 5)
+
     cubes.forEach((o) => {
       o.userData.update(o);
     });
@@ -239,7 +243,11 @@ class App extends Component {
       for (j = 0; j < gridCount; j++) {
 
         // TODO matcap
-        let matcap_material = new THREE.MeshMatcapMaterial({ matcap: rubik_matcaps[randomColors[count]], });
+        // let material = new THREE.MeshMatcapMaterial({ matcap: rubik_matcaps[randomColors[count]], });
+        let color = rubik_colors[randomColors[count]];
+        // emissiveIntensity:1, shininess:0.5, reflectivity: 1, lightMapIntensity: 1 emissive: color, emissiveIntensity:0.1,
+        let material = new THREE.MeshPhongMaterial({ color: color, side: THREE.DoubleSide });
+
         // let material = new THREE.MeshBasicMaterial({
         //   color: rubik_colors[randomColors[count]],
         // });
@@ -267,7 +275,7 @@ class App extends Component {
         //   );
         // }
 
-        const cube = new THREE.Mesh(cube_geometry, matcap_material);
+        const cube = new THREE.Mesh(cube_geometry, material);
         cube.position.x = xPos;
         cube.position.y = yPos;
         cube.userData.id = `${i}${j}`;
@@ -390,6 +398,7 @@ class App extends Component {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
     renderer.setAnimationLoop(this.animation);
 
+
     controls = new OrbitControls(camera, appEl);
     controls.enableDamping = true;
 
@@ -397,27 +406,57 @@ class App extends Component {
     this.generateMasterCubes();
     appEl.appendChild(renderer.domElement);
 
-    const ambientLight = new THREE.AmbientLight('0xFFFFFF', 0);
+    
+    const ambientLight = new THREE.AmbientLight('0xFFFFFF', 0.5);
     scene.add(ambientLight);
 
-    // const directionLight = new THREE.DirectionalLight('0x0000ff', 1);
-    // directionLight.position.set(1, 0, 2)
+    
+    // const directionLight = new THREE.DirectionalLight('0x0000ff', 0.1);
+    // directionLight.position.set(0, 0, 10);
+    // directionLight.target = gamePieces;
     // scene.add(directionLight);
 
-    const hemisphereLight = new THREE.HemisphereLight(0xff0000, 0x0000ff, 0.3)
-scene.add(hemisphereLight);
+    // spotLight = new THREE.SpotLight(0xffffff, 0.5, 10, Math.PI * 0.1, 0.25, 1)
+    // spotLight.position.set(0, 0, 10)
+    // scene.add(spotLight)
 
+    const color = 0xFFFFFF;
+const intensity = .7;
+const light = new THREE.DirectionalLight(color, intensity);
+light.position.set(0, 10, -20);
+light.target.position.set(10, 0, -26);
+scene.add(light);
+scene.add(light.target);
 
-const pointLight = new THREE.PointLight(0xff9000, 0.5)
-pointLight.position.set(1, - 0.5, 1);
+const gui = new GUI({ closed: true });
+// gui.addColor(new THREE.ColorGUIHelper(light, 'color'), 'value').name('color');
+gui.add(light, 'intensity', 0, 2, 0.01);
 
-scene.add(pointLight);
+gui.add(light.position, 'x', -50, 50);
+gui.add(light.position, 'z', -20, 10);
+gui.add(light.position, 'y', 0, 10);
 
-const rectAreaLight = new THREE.RectAreaLight(0x4e00ff, 2, 1, 1)
-rectAreaLight.position.set(-1.5, 0, 1)
-rectAreaLight.lookAt(new THREE.Vector3())
+gui.add(light.target.position, 'x', -10, 0);
+gui.add(light.target.position, 'z', -50, 0);
+gui.add(light.target.position, 'y', 0, 10);
 
-scene.add(rectAreaLight)
+    
+    const hemisphereLight = new THREE.HemisphereLight(0xefeb84, 0x0000ff, .3)
+    hemisphereLight.position.set(0,0,1)
+    scene.add(hemisphereLight);
+
+    //
+    // const rectAreaLight = new THREE.RectAreaLight(0x4e00ff, 2, 2, 4)
+    // rectAreaLight.position.set(0, 0, 0)
+    // rectAreaLight.lookAt(new THREE.Vector3())
+    // scene.add(rectAreaLight)
+
+    
+    // const pointLight = new THREE.PointLight(0xffffff, 1)
+    // pointLight.distance = 0;
+    // pointLight.decay = .1
+    // pointLight.position.set(0, 0, 0);
+    // scene.add(pointLight);
 
   };
 
